@@ -157,7 +157,7 @@ pactl set-default-sink unified-upmix
 ### 9. Set volumes
 
 ```bash
-amixer -c 0 sset Speaker 100%
+amixer -c X3 sset Speaker 100%
 wpctl set-volume unified-upmix 1.0
 ```
 
