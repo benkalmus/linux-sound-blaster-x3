@@ -60,6 +60,17 @@ Voicemeeter sender must be set to 2 channels. The upmix happens on the receiver 
 
 ## Install Steps
 
+### 0. Systemd override: wait for X3 USB device
+
+Prevents race condition where PipeWire starts before the X3 pro-output-0 sink is ready, causing the loopback to fall back to a 2ch S/PDIF sink.
+
+```bash
+mkdir -p ~/.config/systemd/user/pipewire.service.d
+ln -snf ~/repos/audio-setup-sound-blaster-x3/configs/x3-wait.conf \
+    ~/.config/systemd/user/pipewire.service.d/x3-wait.conf
+systemctl --user daemon-reload
+```
+
 ### 1. Set PipeWire profile to pro-audio
 
 ```bash
