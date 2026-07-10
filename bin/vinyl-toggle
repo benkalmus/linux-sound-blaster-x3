@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SOURCE="alsa_input.usb-Creative_Technology_Ltd_Sound_Blaster_X3_9E42D45FF9ACC811-03.analog-stereo"
+SINK="unified-upmix"
+LINEIN_PORT="analog-input"
+STATE_FILE="/tmp/vinyl-loopback-module"
+
+is_active() {
+    [[ -f "$STATE_FILE" ]]
+}
+
+link() {
+    pactl set-source-port "$SOURCE" "$LINEIN_PORT"
+    MODULE_ID=$(pactl load-module module-loopback \
+        source="$SOURCE" \
+        sink="$SINK" \
+        latency_msec=20 \
+        source_dont_move=true \
+        sink_dont_move=true)
+    echo "$MODULE_ID" > "$STATE_FILE"
+    echo "Vinyl passthrough ON (line-in → unified-upmix, module $MODULE_ID)"
+}
+
+unlink() {
+    if [[ -f "$STATE_FILE" ]]; then
+        MODULE_ID=$(cat "$STATE_FILE")
+        pactl unload-module "$MODULE_ID" 2>/dev/null || true
+        rm -f "$STATE_FILE"
+    fi
+    echo "Vinyl passthrough OFF"
+}
+
+case "${1:-}" in
+    on)  is_active && echo "Already ON" || link ;;
+    off) is_active && unlink || echo "Already OFF" ;;
+    status) is_active && echo "ON" || echo "OFF" ;;
+    *)
+        if is_active; then
+            unlink
+        else
+            link
+        fi
+        ;;
+esac

@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+# NetworkManager dispatcher script: restart PipeWire on network interface up.
+# Fixes VBAN receiver losing audio after WiFi <-> ethernet switch.
+#
+# Install: sudo ln -snf ~/repos/audio-setup-sound-blaster-x3/configs/99-restart-pipewire \
+#              /etc/NetworkManager/dispatcher.d/99-restart-pipewire
+
+INTERFACE="$1"
+ACTION="$2"
+
+case "$INTERFACE" in
+    lo|docker*|br-*|veth*|tailscale*) exit 0 ;;
+esac
+
+if [[ "$ACTION" == "up" ]]; then
+    XDG_RUNTIME_DIR="/run/user/1000" \
+        sudo -u benkalmus \
+        XDG_RUNTIME_DIR="/run/user/1000" \
+        systemctl --user restart pipewire.service
+fi
