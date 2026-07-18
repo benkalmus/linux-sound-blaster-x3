@@ -190,6 +190,94 @@ speaker-test -c 4 -D pipewire -t wav -l 1
 pactl info | grep "Default Sink"
 ```
 
+## Global Persistence (Multi-User)
+
+By default, the install steps above place config symlinks in `~/.config/pipewire/` and `~/.config/wireplumber/` (per-user). For multi-user machines, you can symlink into `/etc/pipewire/` and `/etc/wireplumber/` instead. PipeWire loads configs from all three levels (defaults → system → user), so system-level configs apply to every user.
+
+### Which configs go where
+
+| Config | System path | Machine |
+|--------|-------------|---------|
+| `unified-upmix-sink.conf` | `/etc/pipewire/pipewire.conf.d/` | receiver |
+| `vban-recv.conf` | `/etc/pipewire/pipewire.conf.d/` | receiver |
+| `vban-send.conf` | `/etc/pipewire/pipewire.conf.d/` | sender |
+| `pipewire-pulse-upmix.conf` | `/etc/pipewire/pipewire-pulse.conf.d/upmix.conf` | both |
+| `client-upmix.conf` | `/etc/pipewire/client.conf.d/upmix.conf` | both |
+| `60-bluetooth-route.conf` | `/etc/wireplumber/wireplumber.conf.d/` | both |
+| `61-vban-route.conf` | `/etc/wireplumber/wireplumber.conf.d/` | receiver |
+| `51-no-seat-monitoring.conf` | `/etc/wireplumber/wireplumber.conf.d/` | both |
+
+### One-time setup
+
+Run these commands as sudo on each machine:
+
+```bash
+# Create system config directories
+sudo mkdir -p /etc/pipewire/pipewire.conf.d
+sudo mkdir -p /etc/pipewire/client.conf.d
+sudo mkdir -p /etc/pipewire/pipewire-pulse.conf.d
+sudo mkdir -p /etc/wireplumber/wireplumber.conf.d
+
+# Unified upmix sink (receiver only)
+sudo ln -snf ~/repos/audio-setup-sound-blaster-x3/configs/unified-upmix-sink.conf \
+    /etc/pipewire/pipewire.conf.d/unified-upmix-sink.conf
+
+# VBAN receiver (receiver only)
+sudo ln -snf ~/repos/audio-setup-sound-blaster-x3/configs/vban-recv.conf \
+    /etc/pipewire/pipewire.conf.d/vban-recv.conf
+
+# VBAN sender (sender only)
+sudo ln -snf ~/repos/audio-setup-sound-blaster-x3/configs/vban-send.conf \
+    /etc/pipewire/pipewire.conf.d/vban-send.conf
+
+# Upmix configs for all users
+sudo ln -snf ~/repos/audio-setup-sound-blaster-x3/configs/pipewire-pulse-upmix.conf \
+    /etc/pipewire/pipewire-pulse.conf.d/upmix.conf
+
+sudo ln -snf ~/repos/audio-setup-sound-blaster-x3/configs/client-upmix.conf \
+    /etc/pipewire/client.conf.d/upmix.conf
+
+# WirePlumber routing
+sudo ln -snf ~/repos/audio-setup-sound-blaster-x3/configs/60-bluetooth-route.conf \
+    /etc/wireplumber/wireplumber.conf.d/60-bluetooth-route.conf
+
+sudo ln -snf ~/repos/audio-setup-sound-blaster-x3/configs/61-vban-route.conf \
+    /etc/wireplumber/wireplumber.conf.d/61-vban-route.conf
+
+# Seat monitoring (already in /etc, but idempotent)
+sudo ln -snf ~/repos/audio-setup-sound-blaster-x3/configs/51-no-seat-monitoring.conf \
+    /etc/wireplumber/wireplumber.conf.d/51-no-seat-monitoring.conf
+```
+
+### Remove user-level symlinks
+
+When system-level configs are in place, remove the per-user symlinks to avoid double-loading:
+
+```bash
+# PipeWire
+rm -f ~/.config/pipewire/pipewire.conf.d/unified-upmix-sink.conf
+rm -f ~/.config/pipewire/pipewire.conf.d/vban-recv.conf
+rm -f ~/.config/pipewire/pipewire.conf.d/vban-send.conf
+rm -f ~/.config/pipewire/client.conf.d/upmix.conf
+rm -f ~/.config/pipewire/pipewire-pulse.conf.d/upmix.conf
+
+# WirePlumber
+rm -f ~/.config/wireplumber/wireplumber.conf.d/60-bluetooth-route.conf
+rm -f ~/.config/wireplumber/wireplumber.conf.d/61-vban-route.conf
+```
+
+### Restart
+
+```bash
+systemctl --user restart pipewire pipewire-pulse wireplumber
+```
+
+### Notes
+
+- `/etc/pipewire/pipewire-pulse.conf.d/upmix.conf` may already exist from the package install (stock version with `mix-lfe=true`). The symlink command above overwrites it with the repo version.
+- If a user has their own config in `~/.config/` at the same path, it takes precedence over the system-level one. Remove the user-level symlink to let the system config apply.
+- The `99-restart-pipewire` NetworkManager dispatcher and `51-sddm-no-bluetooth.conf` already use `/etc/` paths — they are already global.
+
 ## Symlink Summary
 
 Complete list of all symlinks for this setup:
