@@ -50,13 +50,31 @@ Key settings:
 
 The `channelmix.*` properties only activate when PipeWire converts between channel counts (e.g. stereo source to 4ch sink).
 
-## VBAN Receiver
+## VBAN
 
-Config: [configs/vban-recv.conf](configs/vban-recv.conf)
+Configs: [configs/vban-recv.conf](configs/vban-recv.conf) (receiver), [configs/vban-send.conf](configs/vban-send.conf) (sender)
 
-Receives audio from Windows Voicemeeter over VBAN protocol (UDP port 6980). The stream is declared as 2ch `[FL FR]` with `channelmix.upmix` enabled on the stream itself. This ensures PipeWire upmixes stereo to 4ch before reaching the unified-upmix sink.
+PipeWire's built-in VBAN modules stream audio over UDP at low latency (~5-20ms). The receiver runs on this machine (opti.local), listening on port 6980. The sender runs on the source machine.
 
-Voicemeeter sender must be set to 2 channels. The upmix happens on the receiver side.
+### Receiver
+
+The stream is declared as 2ch `[FL FR]` with `channelmix.upmix` enabled. This ensures PipeWire upmixes stereo to 4ch before reaching the unified-upmix sink. The sender must be set to 2 channels — the upmix happens on the receiver side.
+
+### Sender (Linux)
+
+On the sending machine, clone the repo and symlink the sender config:
+
+```bash
+git clone https://github.com/benkalmus/audio-setup-sound-blaster-x3.git ~/repos/audio-setup-sound-blaster-x3
+mkdir -p ~/.config/pipewire/pipewire.conf.d
+ln -snf ~/repos/audio-setup-sound-blaster-x3/configs/vban-send.conf \
+    ~/.config/pipewire/pipewire.conf.d/vban-send.conf
+systemctl --user restart pipewire
+```
+
+The sender creates a sink named "VBAN Sender to opti". Route app audio to it via pavucontrol. The sink streams 48kHz S16LE stereo to `opti.local:6980`.
+
+Tune latency with `sess.latency.msec` (5ms for wired LAN, 20ms default). `opti.local` must resolve via mDNS (Avahi) — fall back to IP if it doesn't.
 
 ## Install Steps
 
@@ -94,7 +112,17 @@ ln -snf ~/repos/audio-setup-sound-blaster-x3/configs/vban-recv.conf \
     ~/.config/pipewire/pipewire.conf.d/vban-recv.conf
 ```
 
-### 5. Install Bluetooth routing
+### 5. Install VBAN sender (Linux sending machine only)
+
+```bash
+git clone https://github.com/benkalmus/audio-setup-sound-blaster-x3.git ~/repos/audio-setup-sound-blaster-x3
+mkdir -p ~/.config/pipewire/pipewire.conf.d
+ln -snf ~/repos/audio-setup-sound-blaster-x3/configs/vban-send.conf \
+    ~/.config/pipewire/pipewire.conf.d/vban-send.conf
+systemctl --user restart pipewire
+```
+
+### 6. Install Bluetooth routing
 
 WirePlumber config for routing Bluetooth audio to unified-upmix:
 
@@ -111,7 +139,7 @@ sudo cp bluetooth/main.conf /etc/bluetooth/main.conf
 sudo systemctl restart bluetooth
 ```
 
-### 6. Bluetooth: disable seat monitoring + SDDM conflict
+### 7. Bluetooth: disable seat monitoring + SDDM conflict
 
 Two WirePlumber configs are required to make Bluetooth work:
 
@@ -131,26 +159,26 @@ sudo cp ~/repos/audio-setup-sound-blaster-x3/configs/51-sddm-no-bluetooth.conf \
 sudo systemctl --user -M sddm@.host restart wireplumber
 ```
 
-### 7. Restart services
+### 8. Restart services
 
 ```bash
 systemctl --user restart pipewire pipewire-pulse wireplumber
 ```
 
-### 8. Set default sink
+### 9. Set default sink
 
 ```bash
 pactl set-default-sink unified-upmix
 ```
 
-### 9. Set volumes
+### 10. Set volumes
 
 ```bash
 amixer -c X3 sset Speaker 100%
 wpctl set-volume unified-upmix 1.0
 ```
 
-### 10. Verify
+### 11. Verify
 
 ```bash
 pactl list short sinks
@@ -184,6 +212,10 @@ ln -snf ~/repos/audio-setup-sound-blaster-x3/configs/pipewire-pulse-upmix.conf \
 # VBAN receiver
 ln -snf ~/repos/audio-setup-sound-blaster-x3/configs/vban-recv.conf \
     ~/.config/pipewire/pipewire.conf.d/vban-recv.conf
+
+# VBAN sender (only on the sending machine)
+ln -snf ~/repos/audio-setup-sound-blaster-x3/configs/vban-send.conf \
+    ~/.config/pipewire/pipewire.conf.d/vban-send.conf
 
 # WirePlumber configs
 mkdir -p ~/.config/wireplumber/wireplumber.conf.d
