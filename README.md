@@ -56,9 +56,7 @@ Configs: [configs/vban-recv.conf](configs/vban-recv.conf) (receiver), [configs/v
 
 PipeWire's built-in VBAN modules stream audio over UDP at low latency (~5-20ms). The receiver runs on this machine (opti.local), listening on port 6980. The sender runs on the source machine.
 
-### Receiver
-
-The stream is declared as 2ch `[FL FR]` with `channelmix.upmix` enabled. This ensures PipeWire upmixes stereo to 4ch before reaching the unified-upmix sink. The sender must be set to 2 channels — the upmix happens on the receiver side.
+Both sender and receiver use 5 channels `[FL FR RL RR LFE]` matching the unified-upmix sink. The sender's game audio (5.1) gets FC folded into FL/FR by PipeWire's channel mixer. The receiver connects directly to `unified-upmix` with no additional upmix.
 
 ### Sender (Linux)
 
@@ -72,7 +70,7 @@ ln -snf ~/repos/audio-setup-sound-blaster-x3/configs/vban-send.conf \
 systemctl --user restart pipewire
 ```
 
-The sender creates a sink named "VBAN Sender to opti". Route app audio to it via pavucontrol. The sink streams 48kHz S16LE stereo to `opti.local:6980`.
+The sender creates a sink named "VBAN Sender to opti". Route app audio to it via pavucontrol. The sink streams 48kHz S16LE 5ch `[FL FR RL RR LFE]` to `opti.local:6980`. Game audio at 5.1 is downmixed on the sender side (FC folded into FL/FR by PipeWire's channel mixer).
 
 Tune latency with `sess.latency.msec` (5ms for wired LAN, 20ms default). `opti.local` must resolve via mDNS (Avahi) — fall back to IP if it doesn't.
 
