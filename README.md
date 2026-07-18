@@ -72,6 +72,8 @@ systemctl --user restart pipewire
 
 The sender creates a sink named "VBAN Sender to opti". Route app audio to it via pavucontrol. The sink streams 48kHz S16LE 5ch `[FL FR RL RR LFE]` to `opti.local:6980`. Game audio at 5.1 is downmixed on the sender side (FC folded into FL/FR by PipeWire's channel mixer).
 
+LFE extraction requires `channelmix.lfe-cutoff` set in `stream.properties` of `pipewire-pulse.conf.d/`, not in `stream.props` of the sink node. The pipewire-pulse upmix config handles this (see [Install step 3](#3-install-upmix-configs)). Without it, the LFE channel remains silent.
+
 Tune latency with `sess.latency.msec` (5ms for wired LAN, 20ms default). `opti.local` must resolve via mDNS (Avahi) — fall back to IP if it doesn't.
 
 ## Install Steps
@@ -295,3 +297,4 @@ Then connect Line Out 3 (orange) to the subwoofer.
 - **VBAN breaks on network change**: Switching WiFi↔ethernet causes the VBAN receiver to stop receiving audio. A NetworkManager dispatcher script (`99-restart-pipewire`) auto-restarts PipeWire when interfaces come up, restoring VBAN connectivity.
 - **Bluetooth needs seat monitoring disabled**: WirePlumber's bluez monitor waits for logind seat to become "active". SDDM greeter holds seat0 in "online" state, so the monitor never creates. Disable with `configs/51-no-seat-monitoring.conf`.
 - **SDDM WirePlumber grabs Bluetooth endpoints**: SDDM runs its own WirePlumber instance which registers BlueZ endpoints. The user's WirePlumber sees the transport but can't claim it. Disable Bluetooth in SDDM's WirePlumber with `configs/51-sddm-no-bluetooth.conf`.
+- **LFE cutoff only works in pipewire-pulse.conf.d**: `channelmix.lfe-cutoff` must be set in `stream.properties` of `pipewire-pulse.conf.d/`, not in `stream.props` of a sink node. The sink node's property is not inherited by client adapter nodes (e.g. Chromium). The `configs/pipewire-pulse-upmix.conf` file handles this correctly.
