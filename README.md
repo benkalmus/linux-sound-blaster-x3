@@ -70,7 +70,7 @@ ln -snf ~/repos/audio-setup-sound-blaster-x3/configs/vban-send.conf \
 systemctl --user restart pipewire
 ```
 
-The sender creates a sink named "VBAN Sender to opti". Route app audio to it via pavucontrol. The sink streams 48kHz S16LE 5ch `[FL FR RL RR LFE]` to `opti.local:6980`. Game audio at 5.1 is downmixed on the sender side (FC folded into FL/FR by PipeWire's channel mixer).
+The sender creates a sink named "Opti VBAN 5.1". Route app audio to it via pavucontrol. If the sink doesn't appear in the Plasma system tray, right-click the audio icon → **Configure Audio Volume...** → check **Show virtual devices**. The sink streams 48kHz S16LE 5ch `[FL FR RL RR LFE]` to `opti.local:6980`. Game audio at 5.1 is downmixed on the sender side (FC folded into FL/FR by PipeWire's channel mixer).
 
 LFE extraction requires `channelmix.lfe-cutoff` set in `stream.properties` of `pipewire-pulse.conf.d/`, not in `stream.props` of the sink node. The pipewire-pulse upmix config handles this (see [Install step 3](#3-install-upmix-configs)). Without it, the LFE channel remains silent.
 
