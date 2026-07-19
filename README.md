@@ -44,9 +44,9 @@ Key settings:
 
 | File | Location | Scope |
 |------|----------|-------|
-| `unified-upmix-sink.conf` | `pipewire.conf.d/` | Creates the loopback sink with upmix on capture side |
-| `pipewire-pulse-upmix.conf` | `pipewire-pulse.conf.d/` | Default stream properties for PulseAudio clients |
-| `client-upmix.conf` | `client.conf.d/` | Default stream properties for native PipeWire clients |
+| `unified-upmix-sink.conf` | `/etc/pipewire/pipewire.conf.d/` | Creates the loopback sink with upmix on capture side |
+| `pipewire-pulse-upmix.conf` | `/etc/pipewire/pipewire-pulse.conf.d/upmix.conf` | Default stream properties for PulseAudio clients |
+| `client-upmix.conf` | `/etc/pipewire/client.conf.d/upmix.conf` | Default stream properties for native PipeWire clients |
 
 The `channelmix.*` properties only activate when PipeWire converts between channel counts (e.g. stereo source to 4ch sink).
 
@@ -60,125 +60,157 @@ Both sender and receiver use 5 channels `[FL FR RL RR LFE]` matching the unified
 
 ### Sender (Linux)
 
-On the sending machine, clone the repo and symlink the sender config:
+On the sending machine, clone the repo, set `$REPO`, and symlink the sender config:
 
 ```bash
-git clone https://github.com/benkalmus/audio-setup-sound-blaster-x3.git ~/repos/audio-setup-sound-blaster-x3
-mkdir -p ~/.config/pipewire/pipewire.conf.d
-ln -snf ~/repos/audio-setup-sound-blaster-x3/configs/vban-send.conf \
-    ~/.config/pipewire/pipewire.conf.d/vban-send.conf
+git clone https://github.com/benkalmus/linux-sound-blaster-x3.git
+export REPO=$PWD/linux-sound-blaster-x3
+sudo mkdir -p /etc/pipewire/pipewire.conf.d
+sudo ln -snf $REPO/configs/vban-send.conf \
+    /etc/pipewire/pipewire.conf.d/vban-send.conf
 systemctl --user restart pipewire
 ```
 
 The sender creates a sink named "Opti VBAN 5.1". Route app audio to it via pavucontrol. If the sink doesn't appear in the Plasma system tray, right-click the audio icon → **Configure Audio Volume...** → check **Show virtual devices**. The sink streams 48kHz S16LE 5ch `[FL FR RL RR LFE]` to `opti.local:6980`. Game audio at 5.1 is downmixed on the sender side (FC folded into FL/FR by PipeWire's channel mixer).
 
-LFE extraction requires `channelmix.lfe-cutoff` set in `stream.properties` of `pipewire-pulse.conf.d/`, not in `stream.props` of the sink node. The pipewire-pulse upmix config handles this (see [Install step 3](#3-install-upmix-configs)). Without it, the LFE channel remains silent.
+The sender config includes `channelmix.mix-lfe = true` and `lfe-cutoff = 80` so LFE is mixed from low frequencies even with stereo sources.
 
 Tune latency with `sess.latency.msec` (5ms for wired LAN, 20ms default). `opti.local` must resolve via mDNS (Avahi) — fall back to IP if it doesn't.
 
-## Install Steps
+## Install
+
+All configs are installed at system level (`/etc/pipewire/`, `/etc/wireplumber/`) so they apply to all users. PipeWire loads configs from three levels (defaults → system → user), with system-level applying to every user.
+
+### Prerequisites
+
+Clone the repo somewhere and set `$REPO`:
+
+```bash
+git clone https://github.com/benkalmus/linux-sound-blaster-x3.git
+cd linux-sound-blaster-x3
+export REPO=$PWD
+```
+
+All commands below use `$REPO` — define it to wherever you cloned.
 
 ### 1. Set PipeWire profile to pro-audio
 
+The card name varies by machine. Find yours:
+
 ```bash
-pactl set-card-profile alsa_card.usb-Creative_Technology_Ltd_Sound_Blaster_X3_9E42D45FF9ACC811-03 pro-audio
+pactl list cards short | grep -i creative
 ```
 
-### 2. Install unified-upmix sink
+Then set it:
 
 ```bash
-mkdir -p ~/.config/pipewire/pipewire.conf.d
-ln -snf ~/repos/audio-setup-sound-blaster-x3/configs/unified-upmix-sink.conf \
-    ~/.config/pipewire/pipewire.conf.d/unified-upmix-sink.conf
+pactl set-card-profile alsa_card.usb-Creative_Technology_Ltd_Sound_Blaster_X3_<SERIAL>-03 pro-audio
 ```
 
-### 3. Install upmix configs
+### 2. Create system config directories
 
 ```bash
-mkdir -p ~/.config/pipewire/client.conf.d
-mkdir -p ~/.config/pipewire/pipewire-pulse.conf.d
-
-ln -snf ~/repos/audio-setup-sound-blaster-x3/configs/client-upmix.conf \
-    ~/.config/pipewire/client.conf.d/upmix.conf
-
-ln -snf ~/repos/audio-setup-sound-blaster-x3/configs/pipewire-pulse-upmix.conf \
-    ~/.config/pipewire/pipewire-pulse.conf.d/upmix.conf
+sudo mkdir -p /etc/pipewire/pipewire.conf.d
+sudo mkdir -p /etc/pipewire/client.conf.d
+sudo mkdir -p /etc/pipewire/pipewire-pulse.conf.d
+sudo mkdir -p /etc/wireplumber/wireplumber.conf.d
 ```
 
-### 4. Install VBAN receiver
+### 3. Install unified-upmix sink (receiver only)
 
 ```bash
-ln -snf ~/repos/audio-setup-sound-blaster-x3/configs/vban-recv.conf \
-    ~/.config/pipewire/pipewire.conf.d/vban-recv.conf
+sudo ln -snf $REPO/configs/unified-upmix-sink.conf \
+    /etc/pipewire/pipewire.conf.d/unified-upmix-sink.conf
 ```
 
-### 5. Install VBAN sender (Linux sending machine only)
+The `target.object` in `unified-upmix-sink.conf` must match your X3's pro-audio output. Check with:
 
 ```bash
-git clone https://github.com/benkalmus/audio-setup-sound-blaster-x3.git ~/repos/audio-setup-sound-blaster-x3
-mkdir -p ~/.config/pipewire/pipewire.conf.d
-ln -snf ~/repos/audio-setup-sound-blaster-x3/configs/vban-send.conf \
-    ~/.config/pipewire/pipewire.conf.d/vban-send.conf
-systemctl --user restart pipewire
+pactl list sinks short | grep pro-output
 ```
 
-### 6. Install Bluetooth routing
+Update the config if the name differs.
 
-WirePlumber config for routing Bluetooth audio to unified-upmix:
+### 4. Install upmix configs (both machines)
 
 ```bash
-mkdir -p ~/.config/wireplumber/wireplumber.conf.d
-ln -snf ~/repos/audio-setup-sound-blaster-x3/configs/60-bluetooth-route.conf \
-    ~/.config/wireplumber/wireplumber.conf.d/60-bluetooth-route.conf
+sudo ln -snf $REPO/configs/pipewire-pulse-upmix.conf \
+    /etc/pipewire/pipewire-pulse.conf.d/upmix.conf
+
+sudo ln -snf $REPO/configs/client-upmix.conf \
+    /etc/pipewire/client.conf.d/upmix.conf
 ```
 
-Bluetooth CoD (Class of Device) config so the PC advertises as a speaker:
+### 5. Install VBAN receiver (receiver only)
 
 ```bash
-sudo cp bluetooth/main.conf /etc/bluetooth/main.conf
-sudo systemctl restart bluetooth
+sudo ln -snf $REPO/configs/vban-recv.conf \
+    /etc/pipewire/pipewire.conf.d/vban-recv.conf
 ```
 
-### 7. Bluetooth: disable seat monitoring + SDDM conflict
-
-Two WirePlumber configs are required to make Bluetooth work:
-
-**Seat monitoring:** WirePlumber's bluez monitor waits for logind seat to become "active". Since the SDDM greeter holds seat0 in "online" state, the monitor never creates. Disable it:
+### 6. Install VBAN sender (sender only)
 
 ```bash
-sudo ln -snf ~/repos/audio-setup-sound-blaster-x3/configs/51-no-seat-monitoring.conf \
+sudo ln -snf $REPO/configs/vban-send.conf \
+    /etc/pipewire/pipewire.conf.d/vban-send.conf
+```
+
+### 7. Install WirePlumber routing
+
+```bash
+sudo ln -snf $REPO/configs/60-bluetooth-route.conf \
+    /etc/wireplumber/wireplumber.conf.d/60-bluetooth-route.conf
+
+sudo ln -snf $REPO/configs/61-vban-route.conf \
+    /etc/wireplumber/wireplumber.conf.d/61-vban-route.conf
+```
+
+### 8. Bluetooth: disable seat monitoring + SDDM conflict
+
+```bash
+sudo ln -snf $REPO/configs/51-no-seat-monitoring.conf \
     /etc/wireplumber/wireplumber.conf.d/51-no-seat-monitoring.conf
-```
 
-**SDDM conflict:** SDDM runs its own WirePlumber instance which grabs Bluetooth endpoints. Disable Bluetooth in SDDM's WirePlumber:
-
-```bash
 sudo mkdir -p /var/lib/sddm/.config/wireplumber/wireplumber.conf.d
-sudo cp ~/repos/audio-setup-sound-blaster-x3/configs/51-sddm-no-bluetooth.conf \
+sudo cp $REPO/configs/51-sddm-no-bluetooth.conf \
     /var/lib/sddm/.config/wireplumber/wireplumber.conf.d/51-no-bluetooth.conf
 sudo systemctl --user -M sddm@.host restart wireplumber
 ```
 
-### 8. Restart services
+### 9. Bluetooth CoD
+
+```bash
+sudo cp $REPO/bluetooth/main.conf /etc/bluetooth/main.conf
+sudo systemctl restart bluetooth
+```
+
+### 10. NetworkManager dispatcher (restarts PipeWire on network change)
+
+```bash
+sudo ln -snf $REPO/configs/99-restart-pipewire \
+    /etc/NetworkManager/dispatcher.d/99-restart-pipewire
+```
+
+### 11. Restart services
 
 ```bash
 systemctl --user restart pipewire pipewire-pulse wireplumber
 ```
 
-### 9. Set default sink
+### 12. Set default sink
 
 ```bash
 pactl set-default-sink unified-upmix
 ```
 
-### 10. Set volumes
+### 13. Set volumes
 
 ```bash
 amixer -c X3 sset Speaker 100%
 wpctl set-volume unified-upmix 1.0
 ```
 
-### 11. Verify
+### 14. Verify
 
 ```bash
 pactl list short sinks
@@ -190,150 +222,11 @@ speaker-test -c 4 -D pipewire -t wav -l 1
 pactl info | grep "Default Sink"
 ```
 
-## Global Persistence (Multi-User)
-
-By default, the install steps above place config symlinks in `~/.config/pipewire/` and `~/.config/wireplumber/` (per-user). For multi-user machines, you can symlink into `/etc/pipewire/` and `/etc/wireplumber/` instead. PipeWire loads configs from all three levels (defaults → system → user), so system-level configs apply to every user.
-
-### Which configs go where
-
-| Config | System path | Machine |
-|--------|-------------|---------|
-| `unified-upmix-sink.conf` | `/etc/pipewire/pipewire.conf.d/` | receiver |
-| `vban-recv.conf` | `/etc/pipewire/pipewire.conf.d/` | receiver |
-| `vban-send.conf` | `/etc/pipewire/pipewire.conf.d/` | sender |
-| `pipewire-pulse-upmix.conf` | `/etc/pipewire/pipewire-pulse.conf.d/upmix.conf` | both |
-| `client-upmix.conf` | `/etc/pipewire/client.conf.d/upmix.conf` | both |
-| `60-bluetooth-route.conf` | `/etc/wireplumber/wireplumber.conf.d/` | both |
-| `61-vban-route.conf` | `/etc/wireplumber/wireplumber.conf.d/` | receiver |
-| `51-no-seat-monitoring.conf` | `/etc/wireplumber/wireplumber.conf.d/` | both |
-
-### One-time setup
-
-Run these commands as sudo on each machine:
-
-```bash
-# Create system config directories
-sudo mkdir -p /etc/pipewire/pipewire.conf.d
-sudo mkdir -p /etc/pipewire/client.conf.d
-sudo mkdir -p /etc/pipewire/pipewire-pulse.conf.d
-sudo mkdir -p /etc/wireplumber/wireplumber.conf.d
-
-# Unified upmix sink (receiver only)
-sudo ln -snf ~/repos/audio-setup-sound-blaster-x3/configs/unified-upmix-sink.conf \
-    /etc/pipewire/pipewire.conf.d/unified-upmix-sink.conf
-
-# VBAN receiver (receiver only)
-sudo ln -snf ~/repos/audio-setup-sound-blaster-x3/configs/vban-recv.conf \
-    /etc/pipewire/pipewire.conf.d/vban-recv.conf
-
-# VBAN sender (sender only)
-sudo ln -snf ~/repos/audio-setup-sound-blaster-x3/configs/vban-send.conf \
-    /etc/pipewire/pipewire.conf.d/vban-send.conf
-
-# Upmix configs for all users
-sudo ln -snf ~/repos/audio-setup-sound-blaster-x3/configs/pipewire-pulse-upmix.conf \
-    /etc/pipewire/pipewire-pulse.conf.d/upmix.conf
-
-sudo ln -snf ~/repos/audio-setup-sound-blaster-x3/configs/client-upmix.conf \
-    /etc/pipewire/client.conf.d/upmix.conf
-
-# WirePlumber routing
-sudo ln -snf ~/repos/audio-setup-sound-blaster-x3/configs/60-bluetooth-route.conf \
-    /etc/wireplumber/wireplumber.conf.d/60-bluetooth-route.conf
-
-sudo ln -snf ~/repos/audio-setup-sound-blaster-x3/configs/61-vban-route.conf \
-    /etc/wireplumber/wireplumber.conf.d/61-vban-route.conf
-
-# Seat monitoring (already in /etc, but idempotent)
-sudo ln -snf ~/repos/audio-setup-sound-blaster-x3/configs/51-no-seat-monitoring.conf \
-    /etc/wireplumber/wireplumber.conf.d/51-no-seat-monitoring.conf
-```
-
-### Remove user-level symlinks
-
-When system-level configs are in place, remove the per-user symlinks to avoid double-loading:
-
-```bash
-# PipeWire
-rm -f ~/.config/pipewire/pipewire.conf.d/unified-upmix-sink.conf
-rm -f ~/.config/pipewire/pipewire.conf.d/vban-recv.conf
-rm -f ~/.config/pipewire/pipewire.conf.d/vban-send.conf
-rm -f ~/.config/pipewire/client.conf.d/upmix.conf
-rm -f ~/.config/pipewire/pipewire-pulse.conf.d/upmix.conf
-
-# WirePlumber
-rm -f ~/.config/wireplumber/wireplumber.conf.d/60-bluetooth-route.conf
-rm -f ~/.config/wireplumber/wireplumber.conf.d/61-vban-route.conf
-```
-
-### Restart
-
-```bash
-systemctl --user restart pipewire pipewire-pulse wireplumber
-```
-
 ### Notes
 
 - `/etc/pipewire/pipewire-pulse.conf.d/upmix.conf` may already exist from the package install (stock version with `mix-lfe=true`). The symlink command above overwrites it with the repo version.
-- If a user has their own config in `~/.config/` at the same path, it takes precedence over the system-level one. Remove the user-level symlink to let the system config apply.
-- The `99-restart-pipewire` NetworkManager dispatcher and `51-sddm-no-bluetooth.conf` already use `/etc/` paths — they are already global.
-
-## Symlink Summary
-
-Complete list of all symlinks for this setup:
-
-```bash
-# PipeWire configs
-mkdir -p ~/.config/pipewire/pipewire.conf.d
-mkdir -p ~/.config/pipewire/client.conf.d
-mkdir -p ~/.config/pipewire/pipewire-pulse.conf.d
-
-ln -snf ~/repos/audio-setup-sound-blaster-x3/configs/unified-upmix-sink.conf \
-    ~/.config/pipewire/pipewire.conf.d/unified-upmix-sink.conf
-
-ln -snf ~/repos/audio-setup-sound-blaster-x3/configs/client-upmix.conf \
-    ~/.config/pipewire/client.conf.d/upmix.conf
-
-ln -snf ~/repos/audio-setup-sound-blaster-x3/configs/pipewire-pulse-upmix.conf \
-    ~/.config/pipewire/pipewire-pulse.conf.d/upmix.conf
-
-# VBAN receiver
-ln -snf ~/repos/audio-setup-sound-blaster-x3/configs/vban-recv.conf \
-    ~/.config/pipewire/pipewire.conf.d/vban-recv.conf
-
-# VBAN sender (only on the sending machine)
-ln -snf ~/repos/audio-setup-sound-blaster-x3/configs/vban-send.conf \
-    ~/.config/pipewire/pipewire.conf.d/vban-send.conf
-
-# WirePlumber configs
-mkdir -p ~/.config/wireplumber/wireplumber.conf.d
-
-ln -snf ~/repos/audio-setup-sound-blaster-x3/configs/60-bluetooth-route.conf \
-    ~/.config/wireplumber/wireplumber.conf.d/60-bluetooth-route.conf
-
-ln -snf ~/repos/audio-setup-sound-blaster-x3/configs/61-vban-route.conf \
-    ~/.config/wireplumber/wireplumber.conf.d/61-vban-route.conf
-
-# Seat monitoring (sudo)
-sudo ln -snf ~/repos/audio-setup-sound-blaster-x3/configs/51-no-seat-monitoring.conf \
-    /etc/wireplumber/wireplumber.conf.d/51-no-seat-monitoring.conf
-
-# SDDM Bluetooth disable (sudo, must copy not symlink)
-sudo mkdir -p /var/lib/sddm/.config/wireplumber/wireplumber.conf.d
-sudo cp ~/repos/audio-setup-sound-blaster-x3/configs/51-sddm-no-bluetooth.conf \
-    /var/lib/sddm/.config/wireplumber/wireplumber.conf.d/51-no-bluetooth.conf
-
-# Vinyl toggle script
-mkdir -p ~/bin
-ln -snf ~/repos/audio-setup-sound-blaster-x3/bin/vinyl-toggle ~/bin/vinyl-toggle
-
-# Bluetooth CoD (sudo)
-sudo cp ~/repos/audio-setup-sound-blaster-x3/bluetooth/main.conf /etc/bluetooth/main.conf
-
-# NetworkManager dispatcher (restarts PipeWire on network change, fixes VBAN)
-sudo ln -snf ~/repos/audio-setup-sound-blaster-x3/configs/99-restart-pipewire \
-    /etc/NetworkManager/dispatcher.d/99-restart-pipewire
-```
+- If a user has their own config in `~/.config/` at the same path, it takes precedence over the system-level one. Remove user-level symlinks to let the system config apply.
+- The `target.object` in `unified-upmix-sink.conf` contains a machine-specific serial number. Verify and update if needed.
 
 ## Vinyl Passthrough
 
@@ -360,23 +253,16 @@ vinyl-toggle status   # print ON or OFF
 
 ```bash
 mkdir -p ~/bin
-ln -snf ~/repos/audio-setup-sound-blaster-x3/bin/vinyl-toggle ~/bin/vinyl-toggle
+ln -snf $REPO/bin/vinyl-toggle ~/bin/vinyl-toggle
 ```
 
 Ensure `~/bin` is in `$PATH` (it is by default on Kubuntu).
 
 ## Adding a Subwoofer
 
-When ready, add AUX5 (or the correct AUX mapping for physical LFE) to the playback position array:
+The unified-upmix sink already maps LFE to AUX3 (orange jack, Line Out 3). Connect the subwoofer to Line Out 3 (orange).
 
-```lua
-playback.props = {
-    audio.position = [ AUX0 AUX1 AUX4 AUX5 AUX? ]  # add sub channel
-    target.object = "...pro-output-0"
-}
-```
-
-Then connect Line Out 3 (orange) to the subwoofer.
+If the AUX mapping differs on your machine, update the `playback.props` position array in `unified-upmix-sink.conf`:
 
 ## Known Quirks
 
@@ -385,4 +271,4 @@ Then connect Line Out 3 (orange) to the subwoofer.
 - **VBAN breaks on network change**: Switching WiFi↔ethernet causes the VBAN receiver to stop receiving audio. A NetworkManager dispatcher script (`99-restart-pipewire`) auto-restarts PipeWire when interfaces come up, restoring VBAN connectivity.
 - **Bluetooth needs seat monitoring disabled**: WirePlumber's bluez monitor waits for logind seat to become "active". SDDM greeter holds seat0 in "online" state, so the monitor never creates. Disable with `configs/51-no-seat-monitoring.conf`.
 - **SDDM WirePlumber grabs Bluetooth endpoints**: SDDM runs its own WirePlumber instance which registers BlueZ endpoints. The user's WirePlumber sees the transport but can't claim it. Disable Bluetooth in SDDM's WirePlumber with `configs/51-sddm-no-bluetooth.conf`.
-- **LFE cutoff only works in pipewire-pulse.conf.d**: `channelmix.lfe-cutoff` must be set in `stream.properties` of `pipewire-pulse.conf.d/`, not in `stream.props` of a sink node. The sink node's property is not inherited by client adapter nodes (e.g. Chromium). The `configs/pipewire-pulse-upmix.conf` file handles this correctly.
+- **LFE cutoff in client config**: `channelmix.lfe-cutoff` must be set in `stream.properties` of `pipewire-pulse.conf.d/`, not in `stream.props` of a sink node. The sink node's property is not inherited by client adapter nodes (e.g. Chromium). The `configs/pipewire-pulse-upmix.conf` file handles this correctly. The VBAN sender config includes `mix-lfe` and `lfe-cutoff` in its own `stream.props` since it's a module, not a client-connected sink.
