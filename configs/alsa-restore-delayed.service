@@ -1,0 +1,7 @@
+[Unit]
+Description=Restore ALSA mixer levels after PipeWire
+After=multi-user.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/sbin/alsactl restore

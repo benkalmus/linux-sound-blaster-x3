@@ -1,0 +1,8 @@
+[Unit]
+Description=Delayed ALSA mixer restore after boot
+
+[Timer]
+OnBootSec=10s
+
+[Install]
+WantedBy=timers.target

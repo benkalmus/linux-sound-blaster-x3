@@ -65,7 +65,7 @@ On the sending machine, clone the repo, set `$REPO`, and symlink the sender conf
 
 ```bash
 git clone https://github.com/benkalmus/linux-sound-blaster-x3.git
-export REPO=$PWD/linux-sound-blaster-x3
+export REPO=$PWD
 sudo mkdir -p /etc/pipewire/pipewire.conf.d
 sudo ln -snf $REPO/configs/vban-send.conf \
     /etc/pipewire/pipewire.conf.d/vban-send.conf
@@ -262,6 +262,26 @@ Ensure `~/bin` is in `$PATH` (it is by default on Kubuntu).
 ## Adding a Subwoofer
 
 The unified-upmix sink maps LFE to AUX3 (orange jack, Line Out 3). The subwoofer connects there. LFE is extracted from stereo sources via `channelmix.lfe-cutoff = 80` in `pipewire-pulse-upmix.conf` and `client-upmix.conf`. The `channelmix.mix-lfe = false` prevents the extracted LFE from being folded back into FL/FR.
+
+## ALSA Mixer Reset on Boot
+
+The X3's USB audio descriptor is incomplete. PipeWire probes the device with unsupported channel configs, fails with `Broken configuration: no configurations available`, and the failed init resets the hardware mixer. The built-in `alsa-restore.service` runs too early (before PipeWire), so levels get stomped.
+
+Configs: [configs/alsa-restore-delayed.service](configs/alsa-restore-delayed.service), [configs/alsa-restore-delayed.timer](configs/alsa-restore-delayed.timer)
+
+A systemd timer runs `alsactl restore` 10 seconds after boot, after PipeWire has settled.
+
+```bash
+sudo ln -snf $REPO/configs/alsa-restore-delayed.service /etc/systemd/system/alsa-restore-delayed.service
+sudo ln -snf $REPO/configs/alsa-restore-delayed.timer /etc/systemd/system/alsa-restore-delayed.timer
+sudo systemctl enable --now alsa-restore-delayed.timer
+```
+
+First, save current levels:
+
+```bash
+sudo alsactl store
+```
 
 ## Known Quirks
 
