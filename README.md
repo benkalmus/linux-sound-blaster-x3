@@ -1,12 +1,12 @@
-# Audio Setup: Sound Blaster X3 Surround 4.0
+# Audio Setup: Sound Blaster X3 Surround
 
 ## Hardware
 
 - **Sound card**: Creative Sound Blaster X3 
 - **Front speakers**: Edifier powered pair on Line Out 1 (green, Front L/R)
 - **Rear speakers**: Edifier powered pair on Line Out 2 (black, Rear L/R)
+- **Subwoofer**: On Line Out 3 (orange, C/SUB) via AUX3
 - **Line In**: UDreamer turntable (3.5mm headphone out)
-- **Future**: subwoofer on Line Out 3 (orange, C/SUB)
 - **OS**: Kubuntu 26.04 LTS, PipeWire 1.6.2, WirePlumber 0.5.13
 
 ## Known X3 Driver Bug
@@ -19,15 +19,16 @@ The X3 ALSA driver has a channel swap: `RearLeft↔Center` and `RearRight↔LFE`
 | FR | AUX1 | Front Right | Line Out 1 green |
 | RL | AUX4 | Front Center (swapped) | Line Out 2 black |
 | RR | AUX5 | Woofer/LFE (swapped) | Line Out 2 black |
+| LFE | AUX3 | Rear Right (swapped) | Line Out 3 orange |
 
 ## Architecture
 
-Uses PipeWire pro-audio profile with a unified loopback sink that drops FC and LFE channels.
+Uses PipeWire pro-audio profile with a unified loopback sink that drops the FC channel.
 
 The loopback sink (`unified-upmix`) is the default audio destination:
-- Stereo sources are upmixed to 4 channels using PipeWire's PSD algorithm (`channelmix.upmix-method = psd`)
-- The playback side maps to `[AUX0 AUX1 AUX4 AUX5]`, working around the X3 channel swap bug
-- The orange C/SUB jack carries no signal (not mapped yet)
+- Stereo sources are upmixed to 5 channels using PipeWire's PSD algorithm (`channelmix.upmix-method = psd`)
+- The playback side maps to `[AUX0 AUX1 AUX4 AUX5 AUX3]`, working around the X3 channel swap bug
+- The FC channel is folded into FL/FR by PipeWire's channel mixer (no physical center speaker)
 
 ## Unified Upmix Sink
 
@@ -36,8 +37,8 @@ Config: [configs/unified-upmix-sink.conf](configs/unified-upmix-sink.conf)
 All audio (local playback, Bluetooth, VBAN) routes through this sink.
 
 Key settings:
-- `capture.props`: 4 channels `[FL FR RL RR]`. PSD upmix applied to any connected stereo stream.
-- `playback.props`: 4 channels `[AUX0 AUX1 AUX4 AUX5]` targeting pro-output-0.
+- `capture.props`: 5 channels `[FL FR RL RR LFE]`. PSD upmix applied to any connected stereo stream.
+- `playback.props`: 5 channels `[AUX0 AUX1 AUX4 AUX5 AUX3]` targeting pro-output-0.
 - `target.object` points to `alsa_output.usb-Creative_Technology_Ltd_Sound_Blaster_X3_9E42D45FF9ACC811-03.pro-output-0`
 
 ### Upmix Config Scopes
@@ -48,7 +49,7 @@ Key settings:
 | `pipewire-pulse-upmix.conf` | `/etc/pipewire/pipewire-pulse.conf.d/upmix.conf` | Default stream properties for PulseAudio clients |
 | `client-upmix.conf` | `/etc/pipewire/client.conf.d/upmix.conf` | Default stream properties for native PipeWire clients |
 
-The `channelmix.*` properties only activate when PipeWire converts between channel counts (e.g. stereo source to 4ch sink).
+The `channelmix.*` properties only activate when PipeWire converts between channel counts (e.g. stereo source to 5ch sink).
 
 ## VBAN
 
@@ -217,7 +218,7 @@ pactl list short sinks
 
 paplay /usr/share/sounds/freedesktop/stereo/bell.oga
 
-speaker-test -c 4 -D pipewire -t wav -l 1
+speaker-test -c 5 -D pipewire -t wav -l 1
 
 pactl info | grep "Default Sink"
 ```
@@ -230,13 +231,13 @@ pactl info | grep "Default Sink"
 
 ## Vinyl Passthrough
 
-UDreamer turntable (3.5mm headphone out) to X3 Line-In to 4.0 speakers.
+UDreamer turntable (3.5mm headphone out) to X3 Line-In to 5.1 speakers.
 
 Script: [bin/vinyl-toggle](bin/vinyl-toggle)
 
 Toggle on/off to avoid ADC hiss when turntable is idle. When ON:
 1. Loads `module-loopback` (source to unified-upmix)
-2. Stereo signal gets PSD-upmixed to 4.0
+2. Stereo signal gets PSD-upmixed to 5.1
 
 When OFF: unloads loopback.
 
@@ -260,9 +261,7 @@ Ensure `~/bin` is in `$PATH` (it is by default on Kubuntu).
 
 ## Adding a Subwoofer
 
-The unified-upmix sink already maps LFE to AUX3 (orange jack, Line Out 3). Connect the subwoofer to Line Out 3 (orange).
-
-If the AUX mapping differs on your machine, update the `playback.props` position array in `unified-upmix-sink.conf`:
+The unified-upmix sink maps LFE to AUX3 (orange jack, Line Out 3). The subwoofer connects there. LFE is extracted from stereo sources via `channelmix.lfe-cutoff = 80` in `pipewire-pulse-upmix.conf` and `client-upmix.conf`. The `channelmix.mix-lfe = false` prevents the extracted LFE from being folded back into FL/FR.
 
 ## Known Quirks
 
