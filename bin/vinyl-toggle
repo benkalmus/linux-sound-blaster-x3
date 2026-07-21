@@ -1,9 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-SOURCE="alsa_input.usb-Creative_Technology_Ltd_Sound_Blaster_X3_9E42D45FF9ACC811-03.analog-stereo"
+SOURCE="${SOURCE:-$(pactl list sources short 2>/dev/null | { grep -i 'alsa_input.*Sound_Blaster_X3' || true; } | head -1 | awk '{print $2}')}"
+if [[ -z "$SOURCE" ]]; then
+    echo "Error: Sound Blaster X3 input source not found. Set SOURCE= env var." >&2
+    exit 1
+fi
 SINK="unified-upmix"
-LINEIN_PORT="analog-input"
+LINEIN_PORT="${LINEIN_PORT:-analog-input}"
+MIC_PORT="${MIC_PORT:-analog-input-mic}"
 STATE_FILE="/tmp/vinyl-loopback-module"
 
 is_active() {
@@ -11,7 +16,7 @@ is_active() {
 }
 
 link() {
-    pactl set-source-port "$SOURCE" "$LINEIN_PORT"
+    pactl set-source-port "$SOURCE" "$LINEIN_PORT" 2>/dev/null || true
     MODULE_ID=$(pactl load-module module-loopback \
         source="$SOURCE" \
         sink="$SINK" \
@@ -29,6 +34,7 @@ unlink() {
         rm -f "$STATE_FILE"
     fi
     echo "Vinyl passthrough OFF"
+    pactl set-source-port "$SOURCE" "$MIC_PORT" 2>/dev/null || true
 }
 
 case "${1:-}" in
