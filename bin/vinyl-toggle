@@ -17,10 +17,14 @@ is_active() {
 
 link() {
     pactl set-source-port "$SOURCE" "$LINEIN_PORT" 2>/dev/null || true
+    amixer -c X3 set 'PCM Capture Source' 'Aux In' >/dev/null 2>&1 || true
+    amixer -c X3 cset name='Aux In Capture Switch' on >/dev/null 2>&1 || true
     MODULE_ID=$(pactl load-module module-loopback \
         source="$SOURCE" \
         sink="$SINK" \
         latency_msec=20 \
+        channels=2 \
+        channel_map=front-left,front-right \
         source_dont_move=true \
         sink_dont_move=true)
     echo "$MODULE_ID" > "$STATE_FILE"
@@ -35,6 +39,8 @@ unlink() {
     fi
     echo "Vinyl passthrough OFF"
     pactl set-source-port "$SOURCE" "$MIC_PORT" 2>/dev/null || true
+    amixer -c X3 set 'PCM Capture Source' 'Microphone Array' >/dev/null 2>&1 || true
+    amixer -c X3 cset name='Aux In Capture Switch' off >/dev/null 2>&1 || true
 }
 
 case "${1:-}" in
