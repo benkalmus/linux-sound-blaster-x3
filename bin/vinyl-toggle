@@ -23,10 +23,9 @@ link() {
         source="$SOURCE" \
         sink="$SINK" \
         latency_msec=20 \
-        channels=2 \
-        channel_map=front-left,front-right \
         source_dont_move=true \
-        sink_dont_move=true)
+        sink_dont_move=true \
+        sink_input_properties="channelmix.upmix=true channelmix.upmix-method=psd channelmix.rear-delay=4.0 channelmix.mix-lfe=false channelmix.lfe-cutoff=200")
     echo "$MODULE_ID" > "$STATE_FILE"
     echo "Vinyl passthrough ON (line-in → unified-upmix, module $MODULE_ID)"
 }
