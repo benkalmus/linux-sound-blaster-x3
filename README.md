@@ -192,6 +192,19 @@ sudo ln -snf $REPO/configs/99-restart-pipewire \
     /etc/NetworkManager/dispatcher.d/99-restart-pipewire
 ```
 
+### 10b. PipeWire boot recovery (sender only)
+
+Config: [configs/pipewire-recovery.conf](configs/pipewire-recovery.conf)
+
+On boot PipeWire can start before mDNS resolves `opti.local`, so `vban-send` fails and systemd gives up (`start-limit-hit`). This user drop-in widens the start limit and retries with backoff until the network is ready.
+
+```bash
+mkdir -p ~/.config/systemd/user/pipewire.service.d
+ln -snf $REPO/configs/pipewire-recovery.conf \
+    ~/.config/systemd/user/pipewire.service.d/override.conf
+systemctl --user daemon-reload
+```
+
 ### 11. Restart services
 
 ```bash
