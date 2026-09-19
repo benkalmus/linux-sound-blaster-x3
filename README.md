@@ -259,6 +259,52 @@ ln -snf $REPO/bin/vinyl-toggle ~/bin/vinyl-toggle
 
 Ensure `~/bin` is in `$PATH` (it is by default on Kubuntu).
 
+## Headphone L/R Swap (Onboard Audio)
+
+Some systems (e.g. AMD Matisse/Starship HD Audio + ALC1220 motherboard output) present reversed left/right headphone channels. Two configs are provided, one per layer:
+
+| Config | Layer | How it works |
+|--------|-------|--------------|
+| `configs/swap-lr.conf` | WirePlumber | Sets `audio.position = ["FR","FL"]` on the hardware sink via `monitor.alsa.rules`; same sink name, no graph change |
+| `configs/50-lr-swap.conf` | PipeWire | Loopback virtual sink that swaps in software; needs default-sink switch |
+
+### WirePlumber approach (recommended)
+
+`configs/swap-lr.conf` matches the node by name and flips its channel order. The `node.name` in the match must be your device's sink — find it with:
+
+```bash
+pactl list sinks short | grep analog
+```
+
+Rename the file to a leading number lower than any existing rule, then install (system-wide or per-user):
+
+```bash
+sudo mkdir -p /etc/wireplumber/wireplumber.conf.d
+sudo ln -snf $REPO/configs/swap-lr.conf \
+    /etc/wireplumber/wireplumber.conf.d/swap-lr.conf
+# or per-user instead of system-level:
+# mkdir -p ~/.config/wireplumber/wireplumber.conf.d
+# ln -snf $REPO/configs/swap-lr.conf \
+#     ~/.config/wireplumber/wireplumber.conf.d/swap-lr.conf
+
+systemctl --user restart wireplumber
+```
+
+Verify a channel test (e.g. `speaker-test -c 2 -t wav` or a YouTube L/R test) pans correctly. Revert by removing the symlink and restarting.
+
+### PipeWire loopback alternative
+
+`configs/50-lr-swap.conf` creates a `lr-swapped_sink` virtual sink targeting the hardware sink with `audio.position` mirrored on each side. It adds a processing hop and requires it to be the default sink:
+
+```bash
+sudo ln -snf $REPO/configs/50-lr-swap.conf \
+    /etc/pipewire/pipewire.conf.d/50-lr-swap.conf
+systemctl --user restart pipewire wireplumber
+wpctl set-default lr-swapped_sink
+```
+
+Only the WirePlumber file is needed for a plain headphone flip; the loopback variant is for when a PipeWire-only setup is preferred.
+
 ## Adding a Subwoofer
 
 The unified-upmix sink maps LFE to AUX3 (orange jack, Line Out 3). The subwoofer connects there. LFE is extracted from stereo sources via `channelmix.lfe-cutoff = 80` in `pipewire-pulse-upmix.conf` and `client-upmix.conf`. The `channelmix.mix-lfe = false` prevents the extracted LFE from being folded back into FL/FR.
