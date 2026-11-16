@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+UNIT=bluetooth-auto-agent.service
+
+if systemctl is-enabled --quiet "$UNIT"; then
+  echo "auto-accept is on, KDE does not prompt"
+  echo "run: sudo systemctl disable --now $UNIT"
+else
+  echo "auto-accept is off, KDE prompts for each pairing"
+  echo "run: sudo systemctl enable --now $UNIT"
+fi

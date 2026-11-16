@@ -178,12 +178,36 @@ sudo cp $REPO/configs/51-sddm-no-bluetooth.conf \
 sudo systemctl --user -M sddm@.host restart wireplumber
 ```
 
-### 9. Bluetooth CoD
+### 9. Bluetooth main config
 
 ```bash
-sudo cp $REPO/bluetooth/main.conf /etc/bluetooth/main.conf
+sudo ln -snf $REPO/configs/bluetooth-main.conf /etc/bluetooth/main.conf
 sudo systemctl restart bluetooth
 ```
+
+`JustWorksRepairing=always` lets a previously paired speaker re-pair without the KDE confirmation dialog.
+
+### 9b. Bluetooth auto-accept agent
+
+A headless BlueZ agent answers pairing and connection requests, so a new phone or speaker pairs without the KDE passkey dialog.
+
+```bash
+sudo ln -snf $REPO/bin/bluetooth-auto-agent /usr/local/bin/bluetooth-auto-agent
+sudo ln -snf $REPO/bin/bluetooth-toggle /usr/local/bin/bluetooth-toggle
+sudo ln -snf $REPO/configs/bluetooth-auto-agent.service /etc/systemd/system/bluetooth-auto-agent.service
+sudo systemctl daemon-reload
+sudo systemctl enable --now bluetooth-auto-agent
+```
+
+The agent re-claims the default agent every 5 seconds, because bluedevil takes the default back at each Plasma login. The KDE tray and the Bluetooth settings module keep working.
+
+To hand pairing back to the KDE dialog:
+
+```bash
+bluetooth-toggle
+```
+
+The script prints the enable or disable command for the unit. Run it and the choice survives reboots.
 
 ### 10. NetworkManager dispatcher (restarts PipeWire on network change)
 
