@@ -374,3 +374,15 @@ sudo alsactl store
 - **Bluetooth needs seat monitoring disabled**: WirePlumber's bluez monitor waits for logind seat to become "active". SDDM greeter holds seat0 in "online" state, so the monitor never creates. Disable with `configs/51-no-seat-monitoring.conf`.
 - **SDDM WirePlumber grabs Bluetooth endpoints**: SDDM runs its own WirePlumber instance which registers BlueZ endpoints. The user's WirePlumber sees the transport but can't claim it. Disable Bluetooth in SDDM's WirePlumber with `configs/51-sddm-no-bluetooth.conf`.
 - **LFE cutoff in client config**: `channelmix.lfe-cutoff` must be set in `stream.properties` of `pipewire-pulse.conf.d/`, not in `stream.props` of a sink node. The sink node's property is not inherited by client adapter nodes (e.g. Chromium). The `configs/pipewire-pulse-upmix.conf` file handles this correctly. The VBAN sender config includes `mix-lfe` and `lfe-cutoff` in its own `stream.props` since it's a module, not a client-connected sink.
+
+## Development
+
+Python is checked with ruff and pyright. The agent tests run the real agent against a stub BlueZ on a private D-Bus bus, so they need no adapter, no root, and no restart.
+
+```bash
+make lint   # ruff + pyright
+make test   # six agent scenarios in bluetooth/
+make check  # both
+```
+
+`bin/bluetooth-auto-agent` runs on `/usr/bin/python3` and needs no virtualenv. Its imports come from the Ubuntu packages `python3-dbus` and `python3-gi`, which live in `/usr/lib/python3/dist-packages`; `pyrightconfig.json` points the type checker there for that reason.
