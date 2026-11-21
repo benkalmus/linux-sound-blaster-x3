@@ -18,6 +18,49 @@ install -d /etc/wireplumber/wireplumber.conf.d
 install -d /etc/NetworkManager/dispatcher.d
 install -d /var/lib/sddm/.config/wireplumber/wireplumber.conf.d
 
+# The greeter must never own the X3 or bind the VBAN port. Mask its audio
+# units before the card check, then release the card.
+sddm_units=(
+    pipewire.service
+    pipewire.socket
+    pipewire-pulse.service
+    pipewire-pulse.socket
+    wireplumber.service
+    filter-chain.service
+)
+
+if ! id sddm >/dev/null 2>&1; then
+    log "sddm user not found; skipping greeter audio mask"
+else
+    sddm_uid=$(id -u sddm)
+    if [[ -d /run/user/$sddm_uid ]]; then
+        log "masking the sddm greeter audio units"
+        runuser -u sddm -- env XDG_RUNTIME_DIR="/run/user/$sddm_uid" \
+            systemctl --user mask "${sddm_units[@]}"
+        for unit in "${sddm_units[@]}"; do
+            record "masked-user sddm $unit"
+        done
+        log "stopping the sddm greeter audio units"
+        runuser -u sddm -- env XDG_RUNTIME_DIR="/run/user/$sddm_uid" \
+            systemctl --user stop "${sddm_units[@]}" || true
+    else
+        sddm_home=$(getent passwd sddm | cut -d: -f6)
+        sddm_mask_dir="$sddm_home/.config/systemd/user"
+        log "sddm user manager is not running; writing masks to $sddm_mask_dir"
+        install -d "$sddm_mask_dir"
+        for unit in "${sddm_units[@]}"; do
+            ln -snf /dev/null "$sddm_mask_dir/$unit"
+            record "linked $sddm_mask_dir/$unit"
+        done
+        chown -R sddm: "$sddm_mask_dir"
+    fi
+fi
+
+log "restarting the user audio stack"
+as_user systemctl --user restart pipewire pipewire-pulse wireplumber
+sleep 2
+
+log "setting the X3 card to pro-audio"
 card=$(as_user pactl list cards short | awk '/Creative/ {print $2; exit}')
 if [[ -z $card ]]; then
     echo "Creative card not found. Is the X3 plugged in?" >&2
@@ -25,6 +68,7 @@ if [[ -z $card ]]; then
 fi
 as_user pactl set-card-profile "$card" pro-audio
 
+log "installing the host configs"
 render "$REPO/configs/unified-upmix-sink.conf" /etc/pipewire/pipewire.conf.d/unified-upmix-sink.conf
 render "$REPO/configs/vban-recv.conf" /etc/pipewire/pipewire.conf.d/vban-recv.conf
 link_config "$REPO/configs/pipewire-pulse-upmix.conf" /etc/pipewire/pipewire-pulse.conf.d/upmix.conf
@@ -41,14 +85,16 @@ render "$REPO/configs/99-restart-pipewire" /etc/NetworkManager/dispatcher.d/99-r
 systemctl daemon-reload
 enable_unit alsa-restore-delayed.timer
 
+log "restarting the audio stack with the new config"
 as_user systemctl --user restart pipewire pipewire-pulse wireplumber
 sleep 2
 as_user pactl set-default-sink unified-upmix
 as_user pactl set-sink-volume unified-upmix 100%
 
+log "restoring the X3 mixer"
 # The PipeWire restart re-inits the card and resets the mixer, so restore
 # the saved levels after the restart.
 systemctl start alsa-restore-delayed.service
 record "unit-started alsa-restore-delayed.service"
 
-echo "Host setup complete. Run: make doctor"
+log "host setup complete; run: sudo make doctor"

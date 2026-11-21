@@ -24,7 +24,7 @@ help:
 	@echo "  bluetooth         Bluetooth auto-accept agent and routing"
 	@echo "  vinyl             Install vinyl-toggle into ~/bin"
 	@echo "  all               host + bluetooth + vinyl"
-	@echo "  doctor            Check the installed state (no changes)"
+	@echo "  doctor            Check the installed state (requires sudo)"
 	@echo "Revert targets (run with sudo):"
 	@echo "  revert            Undo all targets that have a manifest"
 	@echo "  revert-host       Undo host"

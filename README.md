@@ -21,7 +21,9 @@ sudo make vinyl
 sudo make all
 ```
 
-`sudo make -n host` previews the commands. `make doctor` checks the installed state.
+`sudo make -n host` previews the commands. `sudo make doctor` checks the installed state.
+
+`sudo make host` masks the sddm user's audio units so the login greeter cannot take the X3 or bind the VBAN port.
 
 The four value-driven configs are rendered into `/etc`, not symlinked. Re-run `sudo make host` after editing `config.conf`. Revert with `sudo make revert-host`, `revert-sender`, `revert-bluetooth`, or `revert-vinyl`.
 
@@ -200,7 +202,7 @@ sudo alsactl store
 - **PSD rear channel requirement**: PipeWire's Passive Surround Decoding only sends audio to rear channels when LEFT and RIGHT differ significantly. Identical mono content produces no rear output. This is correct behaviour.
 - **VBAN breaks on network change**: Switching WiFi↔ethernet causes the VBAN receiver to stop receiving audio. A NetworkManager dispatcher script (`99-restart-pipewire`) auto-restarts PipeWire when interfaces come up, restoring VBAN connectivity.
 - **Bluetooth needs seat monitoring disabled**: WirePlumber's bluez monitor waits for logind seat to become "active". SDDM greeter holds seat0 in "online" state, so the monitor never creates. Disable with `configs/51-no-seat-monitoring.conf`.
-- **SDDM WirePlumber grabs Bluetooth and ALSA**: SDDM runs its own WirePlumber instance. `configs/51-sddm-no-bluetooth.conf` disables its Bluetooth; `configs/51-sddm-no-alsa.conf` disables its ALSA so it does not race the user PipeWire for the X3.
+- **SDDM greeter audio is masked**: `sudo make host` masks the sddm user's `pipewire`, `pipewire-pulse`, `wireplumber`, and `filter-chain` units. The greeter cannot start an audio stack, take the X3, or bind the VBAN port. If the sddm user manager is not running, the installer writes the mask files under the sddm user's `$HOME/.config/systemd/user`. The `51-sddm-no-alsa.conf` and `51-sddm-no-bluetooth.conf` drop-ins remain for installations that keep the greeter's PipeWire.
 - **LFE cutoff in client config**: `channelmix.lfe-cutoff` must be set in `stream.properties` of `pipewire-pulse.conf.d/`, not in `stream.props` of a sink node. The sink node's property is not inherited by client adapter nodes (e.g. Chromium). The `configs/pipewire-pulse-upmix.conf` file handles this correctly. The VBAN sender config includes `mix-lfe` and `lfe-cutoff` in its own `stream.props` since it's a module, not a client-connected sink.
 
 ## Future Work

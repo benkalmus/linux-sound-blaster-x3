@@ -17,6 +17,10 @@ require_root() {
     [[ $EUID -eq 0 ]] || { echo "Run: sudo make $1" >&2; exit 1; }
 }
 
+log() {
+    printf '==> %s\n' "$*"
+}
+
 as_user() {
     if [[ $EUID -eq 0 ]]; then
         runuser -u "$USER_NAME" -- env XDG_RUNTIME_DIR="/run/user/$USER_UID" "$@"
@@ -110,6 +114,10 @@ revert_manifest() {
                 ;;
             unit-was-enabled)
                 : # the unit existed before the install; leave it alone
+                ;;
+            masked-user)
+                runuser -u "$a" -- env XDG_RUNTIME_DIR="/run/user/$(id -u "$a")" \
+                    systemctl --user unmask "$_" || true
                 ;;
             linked|rendered|copied)
                 local bak
