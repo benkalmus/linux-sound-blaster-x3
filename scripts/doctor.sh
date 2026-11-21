@@ -27,9 +27,7 @@ else
     sddm_uid=$(id -u sddm)
     sddm_home=$(getent passwd sddm | cut -d: -f6)
     mask_ok=1
-    for unit in pipewire.service pipewire.socket \
-        pipewire-pulse.service pipewire-pulse.socket \
-        wireplumber.service filter-chain.service; do
+    for unit in "${SDDM_AUDIO_UNITS[@]}"; do
         state=$(runuser -u sddm -- env XDG_RUNTIME_DIR="/run/user/$sddm_uid" \
             systemctl --user is-enabled "$unit" 2>/dev/null || true)
         if [[ $state != masked && ! -L "$sddm_home/.config/systemd/user/$unit" ]]; then

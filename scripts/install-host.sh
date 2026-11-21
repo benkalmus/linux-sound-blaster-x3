@@ -20,15 +20,6 @@ install -d /var/lib/sddm/.config/wireplumber/wireplumber.conf.d
 
 # The greeter must never own the X3 or bind the VBAN port. Mask its audio
 # units before the card check, then release the card.
-sddm_units=(
-    pipewire.service
-    pipewire.socket
-    pipewire-pulse.service
-    pipewire-pulse.socket
-    wireplumber.service
-    filter-chain.service
-)
-
 if ! id sddm >/dev/null 2>&1; then
     log "sddm user not found; skipping greeter audio mask"
 else
@@ -36,19 +27,19 @@ else
     if [[ -d /run/user/$sddm_uid ]]; then
         log "masking the sddm greeter audio units"
         runuser -u sddm -- env XDG_RUNTIME_DIR="/run/user/$sddm_uid" \
-            systemctl --user mask "${sddm_units[@]}"
-        for unit in "${sddm_units[@]}"; do
+            systemctl --user mask "${SDDM_AUDIO_UNITS[@]}"
+        for unit in "${SDDM_AUDIO_UNITS[@]}"; do
             record "masked-user sddm $unit"
         done
         log "stopping the sddm greeter audio units"
         runuser -u sddm -- env XDG_RUNTIME_DIR="/run/user/$sddm_uid" \
-            systemctl --user stop "${sddm_units[@]}" || true
+            systemctl --user stop "${SDDM_AUDIO_UNITS[@]}" || true
     else
         sddm_home=$(getent passwd sddm | cut -d: -f6)
         sddm_mask_dir="$sddm_home/.config/systemd/user"
         log "sddm user manager is not running; writing masks to $sddm_mask_dir"
         install -d "$sddm_mask_dir"
-        for unit in "${sddm_units[@]}"; do
+        for unit in "${SDDM_AUDIO_UNITS[@]}"; do
             ln -snf /dev/null "$sddm_mask_dir/$unit"
             record "linked $sddm_mask_dir/$unit"
         done

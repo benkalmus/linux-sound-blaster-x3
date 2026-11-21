@@ -13,6 +13,15 @@ USER_HOME=$(getent passwd "$USER_NAME" | cut -d: -f6)
 MANIFEST_DIR=/var/lib/linux-sound-blaster-x3
 MANIFEST=
 
+SDDM_AUDIO_UNITS=(
+    pipewire.service
+    pipewire.socket
+    pipewire-pulse.service
+    pipewire-pulse.socket
+    wireplumber.service
+    filter-chain.service
+)
+
 require_root() {
     [[ $EUID -eq 0 ]] || { echo "Run: sudo make $1" >&2; exit 1; }
 }
@@ -104,7 +113,7 @@ revert_manifest() {
         echo "No manifest for $target. Nothing to revert."
         return
     fi
-    while read -r kind a _; do
+    while read -r kind a rest; do
         case $kind in
             unit-enabled)
                 systemctl disable --now "$a" || true
@@ -117,7 +126,7 @@ revert_manifest() {
                 ;;
             masked-user)
                 runuser -u "$a" -- env XDG_RUNTIME_DIR="/run/user/$(id -u "$a")" \
-                    systemctl --user unmask "$_" || true
+                    systemctl --user unmask "$rest" || true
                 ;;
             linked|rendered|copied)
                 local bak
