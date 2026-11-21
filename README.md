@@ -9,17 +9,37 @@
 - **Line In**: UDreamer turntable (3.5mm headphone out)
 - **OS**: Kubuntu 26.04 LTS, PipeWire 1.6.2, WirePlumber 0.5.13
 
-## Known X3 Driver Bug
+## Quick Install
 
-The X3 ALSA driver has a channel swap: `RearLeft↔Center` and `RearRight↔LFE`. The pro-audio profile workaround maps AUX channels to the correct physical outputs:
+```bash
+sudo make            # VBAN host (default)
+sudo make sender     # VBAN sender
+sudo make bluetooth
+sudo make vinyl
+sudo make all
+```
 
-| Our audio | PipeWire | ALSA label | Physical jack |
-|-----------|----------|------------|---------------|
-| FL | AUX0 | Front Left | Line Out 1 green |
-| FR | AUX1 | Front Right | Line Out 1 green |
-| RL | AUX4 | Front Center (swapped) | Line Out 2 black |
-| RR | AUX5 | Woofer/LFE (swapped) | Line Out 2 black |
-| LFE | AUX3 | Rear Right (swapped) | Line Out 3 orange |
+`sudo make -n host` previews the commands. `make doctor` checks the installed state.
+
+## Channel Order And The "Swap" Myth
+
+The X3's USB descriptor and ALSA channel map are standard:
+
+```
+FL FR FC LFE RL RR SL SR
+```
+
+The pro-audio profile exposes these as `aux0` to `aux7`. The playback map is:
+
+| Logical | Aux | Physical jack |
+|---------|-----|---------------|
+| FL | aux0 | Line Out 1 green |
+| FR | aux1 | Line Out 1 green |
+| RL | aux4 | Line Out 2 black |
+| RR | aux5 | Line Out 2 black |
+| LFE | aux3 | Line Out 3 orange |
+
+Older versions of this repo described a `RearLeft↔Center` and `RearRight↔LFE` driver swap. That was a misreading of `amixer`'s channel labels. ALSA names the eight mixer channels in a different order than the X3 descriptor. `amixer` calls index 4 "Front Center" and index 5 "Woofer", but those channels are RL and RR. No aux swap is needed. The full table is in [docs/channel-map.md](docs/channel-map.md).
 
 ## Architecture
 
@@ -27,7 +47,7 @@ Uses PipeWire pro-audio profile with a unified loopback sink that drops the FC c
 
 The loopback sink (`unified-upmix`) is the default audio destination:
 - Stereo sources are upmixed to 5 channels using PipeWire's PSD algorithm (`channelmix.upmix-method = psd`)
-- The playback side maps to `[AUX0 AUX1 AUX4 AUX5 AUX3]`, working around the X3 channel swap bug
+- The playback side maps `[FL FR RL RR LFE]` to `[AUX0 AUX1 AUX4 AUX5 AUX3]` (see [docs/channel-map.md](docs/channel-map.md))
 - The FC channel is folded into FL/FR by PipeWire's channel mixer (no physical center speaker)
 
 ## Unified Upmix Sink
@@ -78,7 +98,9 @@ The sender config includes `channelmix.mix-lfe = true` and `lfe-cutoff = 80` so 
 
 Tune latency with `sess.latency.msec` (5ms for wired LAN, 20ms default). `opti.local` must resolve via mDNS (Avahi) — fall back to IP if it doesn't.
 
-## Install
+## Manual Install (reference)
+
+Prefer `sudo make`. The steps below are the reference.
 
 All configs are installed at system level (`/etc/pipewire/`, `/etc/wireplumber/`) so they apply to all users. PipeWire loads configs from three levels (defaults → system → user), with system-level applying to every user.
 

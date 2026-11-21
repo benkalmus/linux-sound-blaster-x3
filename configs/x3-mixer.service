@@ -1,0 +1,9 @@
+[Unit]
+Description=Restore Sound Blaster X3 speaker volume
+After=sound.target
+
+[Service]
+Type=oneshot
+# Speaker Playback Volume is the X3 hardware control with 8 channels.
+# Index 5 is the right rear, not the sub. See docs/channel-map.md.
+ExecStart=/usr/bin/amixer -c X3 cset name="Speaker Playback Volume" 47,47,47,47,47,47,47,47
