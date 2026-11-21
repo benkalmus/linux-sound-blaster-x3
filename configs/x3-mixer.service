@@ -6,4 +6,4 @@ After=sound.target
 Type=oneshot
 # Speaker Playback Volume is the X3 hardware control with 8 channels.
 # Index 5 is the right rear, not the sub. See docs/channel-map.md.
-ExecStart=/usr/bin/amixer -c X3 cset name="Speaker Playback Volume" 47,47,47,47,47,47,47,47
+ExecStart=/usr/bin/amixer -c @CARD_ID@ cset name="Speaker Playback Volume" 47,47,47,47,47,47,47,47

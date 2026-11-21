@@ -11,6 +11,8 @@
 
 ## Quick Install
 
+Edit `config.conf` first. It holds the peer address, sender name, VBAN port, card id, and X3 sink.
+
 ```bash
 sudo make            # VBAN host (default)
 sudo make sender     # VBAN sender
@@ -20,6 +22,8 @@ sudo make all
 ```
 
 `sudo make -n host` previews the commands. `make doctor` checks the installed state.
+
+The four value-driven configs are rendered into `/etc`, not symlinked. Re-run `sudo make host` after editing `config.conf`. Revert with `sudo make revert-host`, `revert-sender`, `revert-bluetooth`, or `revert-vinyl`.
 
 ## Channel Order And The "Swap" Myth
 
@@ -100,7 +104,7 @@ Tune latency with `sess.latency.msec` (5ms for wired LAN, 20ms default). `opti.l
 
 ## Manual Install (reference)
 
-Prefer `sudo make`. The steps below are the reference.
+The supported path is `sudo make`. The configs in `configs/` now contain `@...@` placeholders, so the `ln -snf` steps below are historical and would install placeholder text. Use the scripts.
 
 All configs are installed at system level (`/etc/pipewire/`, `/etc/wireplumber/`) so they apply to all users. PipeWire loads configs from three levels (defaults → system → user), with system-level applying to every user.
 
