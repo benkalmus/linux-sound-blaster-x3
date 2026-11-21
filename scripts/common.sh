@@ -90,13 +90,25 @@ copy_exec() {
 }
 
 enable_unit() {
-    systemctl enable --now "$1"
-    record "unit-enabled $1"
+    local unit=$1
+    if systemctl is-enabled --quiet "$unit"; then
+        systemctl enable --now "$unit"
+        record "unit-was-enabled $unit"
+    else
+        systemctl enable --now "$unit"
+        record "unit-enabled $unit"
+    fi
 }
 
 start_unit() {
-    systemctl start "$1"
-    record "unit-started $1"
+    local unit=$1
+    if systemctl is-active --quiet "$unit"; then
+        systemctl start "$unit"
+        record "unit-was-active $unit"
+    else
+        systemctl start "$unit"
+        record "unit-started $unit"
+    fi
 }
 
 revert_manifest() {
@@ -113,6 +125,9 @@ revert_manifest() {
                 ;;
             unit-started)
                 systemctl stop "$a" || true
+                ;;
+            unit-was-enabled|unit-was-active)
+                : # the unit existed before the install; leave it alone
                 ;;
             linked|rendered|copied)
                 local bak
