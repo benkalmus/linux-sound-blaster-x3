@@ -6,6 +6,11 @@ source "$(dirname "$0")/common.sh"
 require_root host
 start_manifest host
 
+# Remove the hardcoded X3 mixer units from earlier installs.
+systemctl disable --now x3-mixer.timer 2>/dev/null || true
+systemctl stop x3-mixer.service 2>/dev/null || true
+rm -f /etc/systemd/system/x3-mixer.service /etc/systemd/system/x3-mixer.timer
+
 install -d /etc/pipewire/pipewire.conf.d
 install -d /etc/pipewire/client.conf.d
 install -d /etc/pipewire/pipewire-pulse.conf.d
@@ -30,23 +35,20 @@ copy_file "$REPO/configs/51-sddm-no-alsa.conf" /var/lib/sddm/.config/wireplumber
 
 link_config "$REPO/configs/alsa-restore-delayed.service" /etc/systemd/system/alsa-restore-delayed.service
 link_config "$REPO/configs/alsa-restore-delayed.timer" /etc/systemd/system/alsa-restore-delayed.timer
-render "$REPO/configs/x3-mixer.service" /etc/systemd/system/x3-mixer.service
-link_config "$REPO/configs/x3-mixer.timer" /etc/systemd/system/x3-mixer.timer
 
 render "$REPO/configs/99-restart-pipewire" /etc/NetworkManager/dispatcher.d/99-restart-pipewire 755
 
 systemctl daemon-reload
 enable_unit alsa-restore-delayed.timer
-enable_unit x3-mixer.timer
 
 as_user systemctl --user restart pipewire pipewire-pulse wireplumber
 sleep 2
 as_user pactl set-default-sink unified-upmix
 as_user pactl set-sink-volume unified-upmix 100%
 
-# The PipeWire restart re-inits the card and resets the mixer, so apply
-# the X3 volume after the restart.
-systemctl start x3-mixer.service
-record "unit-started x3-mixer.service"
+# The PipeWire restart re-inits the card and resets the mixer, so restore
+# the saved levels after the restart.
+systemctl start alsa-restore-delayed.service
+record "unit-started alsa-restore-delayed.service"
 
 echo "Host setup complete. Run: make doctor"

@@ -16,4 +16,4 @@ amixer -c "$CARD_ID" cget numid=13 2>/dev/null | sed -n "3p" || true
 echo "== links =="
 as_user pw-link -l 2>/dev/null | grep -A1 "unified-upmix-output" || true
 echo "== units =="
-systemctl is-active alsa-restore-delayed.timer x3-mixer.timer 2>/dev/null || true
+systemctl is-active alsa-restore-delayed.timer 2>/dev/null || true

@@ -2,7 +2,14 @@
 Description=Delayed ALSA mixer restore after boot
 
 [Timer]
-OnBootSec=10s
+# The X3 resets its mixer during boot init. Passes at 15s, 45s, 90s, and
+# 180s cover the window without polling. OnBootSec may be repeated per
+# systemd.timer(5). The stock alsa-restore.service stores the state on
+# shutdown, so these passes restore whatever the user last set.
+OnBootSec=15s
+OnBootSec=45s
+OnBootSec=90s
+OnBootSec=180s
 
 [Install]
 WantedBy=timers.target

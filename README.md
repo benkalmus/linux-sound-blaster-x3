@@ -186,9 +186,9 @@ The X3's USB audio descriptor is incomplete. PipeWire probes the device with uns
 
 Configs: [configs/alsa-restore-delayed.service](configs/alsa-restore-delayed.service), [configs/alsa-restore-delayed.timer](configs/alsa-restore-delayed.timer)
 
-A systemd timer runs `alsactl restore` 10 seconds after boot, after PipeWire has settled. `sudo make host` installs and enables it.
+A systemd timer runs `alsactl restore` at 15s, 45s, 90s, and 180s after boot, after the X3 finishes card init. The stock `alsa-restore.service` stores the current levels on shutdown, so the late passes restore whatever you last set. `sudo make host` installs and enables the timer.
 
-First, save current levels:
+To save the levels without a reboot:
 
 ```bash
 sudo alsactl store
