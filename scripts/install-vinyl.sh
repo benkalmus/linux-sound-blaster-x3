@@ -3,10 +3,11 @@
 set -euo pipefail
 source "$(dirname "$0")/common.sh"
 
+require_root vinyl
 start_manifest vinyl
 
 install -d "$USER_HOME/bin"
-copy_exec "$REPO/bin/vinyl-toggle" "$USER_HOME/bin/vinyl-toggle"
+copy_file "$REPO/bin/vinyl-toggle" "$USER_HOME/bin/vinyl-toggle" 755
 chown "$USER_NAME:$USER_NAME" "$USER_HOME/bin/vinyl-toggle"
 
 echo "Installed $USER_HOME/bin/vinyl-toggle"

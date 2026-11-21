@@ -41,11 +41,10 @@ backup() {
         local bak
         bak="$dest.bak.$(date +%Y%m%d-%H%M%S)"
         mv "$dest" "$bak"
-        record "backup $dest $bak"
     fi
 }
 
-link() {
+link_config() {
     local src=$1
     local dest=$2
     backup "$dest"
@@ -56,6 +55,7 @@ link() {
 render() {
     local src=$1
     local dest=$2
+    local mode=${3:-644}
     local tmp
     tmp=$(mktemp "$(dirname "$dest")/.render.XXXXXX")
     sed \
@@ -67,7 +67,7 @@ render() {
         -e "s|@USER_NAME@|$USER_NAME|g" \
         -e "s|@USER_UID@|$USER_UID|g" \
         "$src" > "$tmp"
-    chmod 644 "$tmp"
+    chmod "$mode" "$tmp"
     backup "$dest"
     mv "$tmp" "$dest"
     record "rendered $dest"
@@ -76,16 +76,9 @@ render() {
 copy_file() {
     local src=$1
     local dest=$2
+    local mode=${3:-644}
     backup "$dest"
-    install -m 644 "$src" "$dest"
-    record "copied $dest"
-}
-
-copy_exec() {
-    local src=$1
-    local dest=$2
-    backup "$dest"
-    install -m 755 "$src" "$dest"
+    install -m "$mode" "$src" "$dest"
     record "copied $dest"
 }
 
@@ -97,17 +90,6 @@ enable_unit() {
     else
         systemctl enable --now "$unit"
         record "unit-enabled $unit"
-    fi
-}
-
-start_unit() {
-    local unit=$1
-    if systemctl is-active --quiet "$unit"; then
-        systemctl start "$unit"
-        record "unit-was-active $unit"
-    else
-        systemctl start "$unit"
-        record "unit-started $unit"
     fi
 }
 
@@ -126,7 +108,7 @@ revert_manifest() {
             unit-started)
                 systemctl stop "$a" || true
                 ;;
-            unit-was-enabled|unit-was-active)
+            unit-was-enabled)
                 : # the unit existed before the install; leave it alone
                 ;;
             linked|rendered|copied)

@@ -63,7 +63,7 @@ All audio (local playback, Bluetooth, VBAN) routes through this sink.
 Key settings:
 - `capture.props`: 5 channels `[FL FR RL RR LFE]`. PSD upmix applied to any connected stereo stream.
 - `playback.props`: 5 channels `[AUX0 AUX1 AUX4 AUX5 AUX3]` targeting pro-output-0.
-- `target.object` points to `alsa_output.usb-Creative_Technology_Ltd_Sound_Blaster_X3_9E42D45FF9ACC811-03.pro-output-0`
+- `target.object` comes from `X3_SINK` in `config.conf` (the X3 pro-audio output).
 
 ### Upmix Config Scopes
 
@@ -79,218 +79,27 @@ The `channelmix.*` properties only activate when PipeWire converts between chann
 
 Configs: [configs/vban-recv.conf](configs/vban-recv.conf) (receiver), [configs/vban-send.conf](configs/vban-send.conf) (sender)
 
-PipeWire's built-in VBAN modules stream audio over UDP at low latency (~5-20ms). The receiver runs on this machine (opti.local), listening on port 6980. The sender runs on the source machine.
+PipeWire's built-in VBAN modules stream audio over UDP at low latency (~5-20ms). The receiver runs on the machine with the X3, listening on `VBAN_PORT` from `config.conf` (default 6980). The sender runs on the source machine.
 
 Both sender and receiver use 5 channels `[FL FR RL RR LFE]` matching the unified-upmix sink. The sender's game audio (5.1) gets FC folded into FL/FR by PipeWire's channel mixer. The receiver connects directly to `unified-upmix` with no additional upmix.
 
 ### Sender (Linux)
 
-On the sending machine, clone the repo, set `$REPO`, and symlink the sender config:
+On the sending machine, clone the repo, edit `config.conf`, and run:
 
 ```bash
-git clone https://github.com/benkalmus/linux-sound-blaster-x3.git
-export REPO=$PWD
-sudo mkdir -p /etc/pipewire/pipewire.conf.d
-sudo ln -snf $REPO/configs/vban-send.conf \
-    /etc/pipewire/pipewire.conf.d/vban-send.conf
-systemctl --user restart pipewire
+sudo make sender
 ```
 
-The sender creates a sink named "Opti VBAN 5.1". Route app audio to it via pavucontrol. If the sink doesn't appear in the Plasma system tray, right-click the audio icon → **Configure Audio Volume...** → check **Show virtual devices**. The sink streams 48kHz S16LE 5ch `[FL FR RL RR LFE]` to `opti.local:6980`. Game audio at 5.1 is downmixed on the sender side (FC folded into FL/FR by PipeWire's channel mixer).
+The sender creates a sink named "Opti VBAN 5.1". Route app audio to it via pavucontrol. If the sink doesn't appear in the Plasma system tray, right-click the audio icon → **Configure Audio Volume...** → check **Show virtual devices**. The sink streams 48kHz S16LE 5ch `[FL FR RL RR LFE]` to `HOST_ADDR:VBAN_PORT` (default `opti.local:6980`). Game audio at 5.1 is downmixed on the sender side (FC folded into FL/FR by PipeWire's channel mixer).
 
 The sender config includes `channelmix.mix-lfe = true` and `lfe-cutoff = 80` so LFE is mixed from low frequencies even with stereo sources.
 
-Tune latency with `sess.latency.msec` (5ms for wired LAN, 20ms default). `opti.local` must resolve via mDNS (Avahi) — fall back to IP if it doesn't.
+Tune latency with `sess.latency.msec` (5ms for wired LAN, 20ms default). `HOST_ADDR` must resolve via mDNS (Avahi) — fall back to IP if it doesn't.
 
-## Manual Install (reference)
+## Manual Install
 
-The supported path is `sudo make`. The configs in `configs/` now contain `@...@` placeholders, so the `ln -snf` steps below are historical and would install placeholder text. Use the scripts.
-
-All configs are installed at system level (`/etc/pipewire/`, `/etc/wireplumber/`) so they apply to all users. PipeWire loads configs from three levels (defaults → system → user), with system-level applying to every user.
-
-### Prerequisites
-
-Clone the repo somewhere and set `$REPO`:
-
-```bash
-git clone https://github.com/benkalmus/linux-sound-blaster-x3.git
-cd linux-sound-blaster-x3
-export REPO=$PWD
-```
-
-All commands below use `$REPO` — define it to wherever you cloned.
-
-### 1. Set PipeWire profile to pro-audio
-
-The card name varies by machine. Find yours:
-
-```bash
-pactl list cards short | grep -i creative
-```
-
-Then set it:
-
-```bash
-pactl set-card-profile alsa_card.usb-Creative_Technology_Ltd_Sound_Blaster_X3_<SERIAL>-03 pro-audio
-```
-
-### 2. Create system config directories
-
-```bash
-sudo mkdir -p /etc/pipewire/pipewire.conf.d
-sudo mkdir -p /etc/pipewire/client.conf.d
-sudo mkdir -p /etc/pipewire/pipewire-pulse.conf.d
-sudo mkdir -p /etc/wireplumber/wireplumber.conf.d
-```
-
-### 3. Install unified-upmix sink (receiver only)
-
-```bash
-sudo ln -snf $REPO/configs/unified-upmix-sink.conf \
-    /etc/pipewire/pipewire.conf.d/unified-upmix-sink.conf
-```
-
-The `target.object` in `unified-upmix-sink.conf` must match your X3's pro-audio output. Check with:
-
-```bash
-pactl list sinks short | grep pro-output
-```
-
-Update the config if the name differs.
-
-### 4. Install upmix configs (both machines)
-
-```bash
-sudo ln -snf $REPO/configs/pipewire-pulse-upmix.conf \
-    /etc/pipewire/pipewire-pulse.conf.d/upmix.conf
-
-sudo ln -snf $REPO/configs/client-upmix.conf \
-    /etc/pipewire/client.conf.d/upmix.conf
-```
-
-### 5. Install VBAN receiver (receiver only)
-
-```bash
-sudo ln -snf $REPO/configs/vban-recv.conf \
-    /etc/pipewire/pipewire.conf.d/vban-recv.conf
-```
-
-### 6. Install VBAN sender (sender only)
-
-```bash
-sudo ln -snf $REPO/configs/vban-send.conf \
-    /etc/pipewire/pipewire.conf.d/vban-send.conf
-```
-
-### 7. Install WirePlumber routing
-
-```bash
-sudo ln -snf $REPO/configs/60-bluetooth-route.conf \
-    /etc/wireplumber/wireplumber.conf.d/60-bluetooth-route.conf
-
-sudo ln -snf $REPO/configs/61-vban-route.conf \
-    /etc/wireplumber/wireplumber.conf.d/61-vban-route.conf
-```
-
-### 8. Bluetooth: disable seat monitoring + SDDM conflict
-
-```bash
-sudo ln -snf $REPO/configs/51-no-seat-monitoring.conf \
-    /etc/wireplumber/wireplumber.conf.d/51-no-seat-monitoring.conf
-
-sudo mkdir -p /var/lib/sddm/.config/wireplumber/wireplumber.conf.d
-sudo cp $REPO/configs/51-sddm-no-bluetooth.conf \
-    /var/lib/sddm/.config/wireplumber/wireplumber.conf.d/51-no-bluetooth.conf
-sudo systemctl --user -M sddm@.host restart wireplumber
-```
-
-### 9. Bluetooth main config
-
-```bash
-sudo ln -snf $REPO/configs/bluetooth-main.conf /etc/bluetooth/main.conf
-sudo systemctl restart bluetooth
-```
-
-`JustWorksRepairing=always` lets a previously paired speaker re-pair without the KDE confirmation dialog.
-
-### 9b. Bluetooth auto-accept agent
-
-A headless BlueZ agent answers pairing and connection requests, so a new phone or speaker pairs without the KDE passkey dialog.
-
-```bash
-sudo ln -snf $REPO/bin/bluetooth-auto-agent /usr/local/bin/bluetooth-auto-agent
-sudo ln -snf $REPO/bin/bluetooth-toggle /usr/local/bin/bluetooth-toggle
-sudo ln -snf $REPO/configs/bluetooth-auto-agent.service /etc/systemd/system/bluetooth-auto-agent.service
-sudo systemctl daemon-reload
-sudo systemctl enable --now bluetooth-auto-agent
-```
-
-The agent re-claims the default agent every 5 seconds, because bluedevil takes the default back at each Plasma login. The KDE tray and the Bluetooth settings module keep working.
-
-To hand pairing back to the KDE dialog:
-
-```bash
-bluetooth-toggle
-```
-
-The script prints the enable or disable command for the unit. Run it and the choice survives reboots.
-
-### 10. NetworkManager dispatcher (restarts PipeWire on network change)
-
-```bash
-sudo ln -snf $REPO/configs/99-restart-pipewire \
-    /etc/NetworkManager/dispatcher.d/99-restart-pipewire
-```
-
-### 10b. PipeWire boot recovery (sender only)
-
-Config: [configs/pipewire-recovery.conf](configs/pipewire-recovery.conf)
-
-On boot PipeWire can start before mDNS resolves `opti.local`, so `vban-send` fails and systemd gives up (`start-limit-hit`). This user drop-in widens the start limit and retries with backoff until the network is ready.
-
-```bash
-mkdir -p ~/.config/systemd/user/pipewire.service.d
-ln -snf $REPO/configs/pipewire-recovery.conf \
-    ~/.config/systemd/user/pipewire.service.d/override.conf
-systemctl --user daemon-reload
-```
-
-### 11. Restart services
-
-```bash
-systemctl --user restart pipewire pipewire-pulse wireplumber
-```
-
-### 12. Set default sink
-
-```bash
-pactl set-default-sink unified-upmix
-```
-
-### 13. Set volumes
-
-```bash
-amixer -c X3 sset Speaker 100%
-wpctl set-volume unified-upmix 1.0
-```
-
-### 14. Verify
-
-```bash
-pactl list short sinks
-
-paplay /usr/share/sounds/freedesktop/stereo/bell.oga
-
-speaker-test -c 5 -D pipewire -t wav -l 1
-
-pactl info | grep "Default Sink"
-```
-
-### Notes
-
-- `/etc/pipewire/pipewire-pulse.conf.d/upmix.conf` may already exist from the package install (stock version with `mix-lfe=true`). The symlink command above overwrites it with the repo version.
-- If a user has their own config in `~/.config/` at the same path, it takes precedence over the system-level one. Remove user-level symlinks to let the system config apply.
-- The `target.object` in `unified-upmix-sink.conf` contains a machine-specific serial number. Verify and update if needed.
+Use `sudo make`. The scripts read `config.conf` and render the templates into `/etc`. The old step-by-step commands are in git history at commit 7192061.
 
 ## Vinyl Passthrough
 
@@ -316,8 +125,7 @@ vinyl-toggle status   # print ON or OFF
 ### Install
 
 ```bash
-mkdir -p ~/bin
-ln -snf $REPO/bin/vinyl-toggle ~/bin/vinyl-toggle
+sudo make vinyl
 ```
 
 Ensure `~/bin` is in `$PATH` (it is by default on Kubuntu).
@@ -378,13 +186,7 @@ The X3's USB audio descriptor is incomplete. PipeWire probes the device with uns
 
 Configs: [configs/alsa-restore-delayed.service](configs/alsa-restore-delayed.service), [configs/alsa-restore-delayed.timer](configs/alsa-restore-delayed.timer)
 
-A systemd timer runs `alsactl restore` 10 seconds after boot, after PipeWire has settled.
-
-```bash
-sudo ln -snf $REPO/configs/alsa-restore-delayed.service /etc/systemd/system/alsa-restore-delayed.service
-sudo ln -snf $REPO/configs/alsa-restore-delayed.timer /etc/systemd/system/alsa-restore-delayed.timer
-sudo systemctl enable --now alsa-restore-delayed.timer
-```
+A systemd timer runs `alsactl restore` 10 seconds after boot, after PipeWire has settled. `sudo make host` installs and enables it.
 
 First, save current levels:
 
@@ -394,11 +196,11 @@ sudo alsactl store
 
 ## Known Quirks
 
-- **X3 channel swap bug**: RearLeft↔Center, RearRight↔LFE. Worked around with AUX remapping.
+- **X3 channel labels look swapped**: `amixer` labels the eight channels in ALSA generic order, so its "Woofer" is the right rear. There is no hardware swap. See [docs/channel-map.md](docs/channel-map.md).
 - **PSD rear channel requirement**: PipeWire's Passive Surround Decoding only sends audio to rear channels when LEFT and RIGHT differ significantly. Identical mono content produces no rear output. This is correct behaviour.
 - **VBAN breaks on network change**: Switching WiFi↔ethernet causes the VBAN receiver to stop receiving audio. A NetworkManager dispatcher script (`99-restart-pipewire`) auto-restarts PipeWire when interfaces come up, restoring VBAN connectivity.
 - **Bluetooth needs seat monitoring disabled**: WirePlumber's bluez monitor waits for logind seat to become "active". SDDM greeter holds seat0 in "online" state, so the monitor never creates. Disable with `configs/51-no-seat-monitoring.conf`.
-- **SDDM WirePlumber grabs Bluetooth endpoints**: SDDM runs its own WirePlumber instance which registers BlueZ endpoints. The user's WirePlumber sees the transport but can't claim it. Disable Bluetooth in SDDM's WirePlumber with `configs/51-sddm-no-bluetooth.conf`.
+- **SDDM WirePlumber grabs Bluetooth and ALSA**: SDDM runs its own WirePlumber instance. `configs/51-sddm-no-bluetooth.conf` disables its Bluetooth; `configs/51-sddm-no-alsa.conf` disables its ALSA so it does not race the user PipeWire for the X3.
 - **LFE cutoff in client config**: `channelmix.lfe-cutoff` must be set in `stream.properties` of `pipewire-pulse.conf.d/`, not in `stream.props` of a sink node. The sink node's property is not inherited by client adapter nodes (e.g. Chromium). The `configs/pipewire-pulse-upmix.conf` file handles this correctly. The VBAN sender config includes `mix-lfe` and `lfe-cutoff` in its own `stream.props` since it's a module, not a client-connected sink.
 
 ## Development
