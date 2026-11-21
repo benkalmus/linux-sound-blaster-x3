@@ -10,6 +10,13 @@ USER_NAME=${SUDO_USER:-$USER}
 USER_UID=$(id -u "$USER_NAME")
 USER_HOME=$(getent passwd "$USER_NAME" | cut -d: -f6)
 
+SDDM_HOME=
+SDDM_UID=
+if getent passwd sddm >/dev/null 2>&1; then
+    SDDM_HOME=$(getent passwd sddm | cut -d: -f6)
+    SDDM_UID=$(id -u sddm)
+fi
+
 MANIFEST_DIR=/var/lib/linux-sound-blaster-x3
 MANIFEST=
 
@@ -30,9 +37,15 @@ log() {
     printf '==> %s\n' "$*"
 }
 
+# as_user [--user NAME] runs the command as NAME with that user's runtime dir.
 as_user() {
+    local user=$USER_NAME
+    if [[ ${1:-} == --user ]]; then
+        user=$2
+        shift 2
+    fi
     if [[ $EUID -eq 0 ]]; then
-        runuser -u "$USER_NAME" -- env XDG_RUNTIME_DIR="/run/user/$USER_UID" "$@"
+        runuser -u "$user" -- env XDG_RUNTIME_DIR="/run/user/$(id -u "$user")" "$@"
     else
         "$@"
     fi
@@ -125,8 +138,7 @@ revert_manifest() {
                 : # the unit existed before the install; leave it alone
                 ;;
             masked-user)
-                runuser -u "$a" -- env XDG_RUNTIME_DIR="/run/user/$(id -u "$a")" \
-                    systemctl --user unmask "$rest" || true
+                as_user --user "$a" systemctl --user unmask "$rest" || true
                 ;;
             linked|rendered|copied)
                 local bak

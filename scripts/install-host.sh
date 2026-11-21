@@ -16,27 +16,25 @@ install -d /etc/pipewire/client.conf.d
 install -d /etc/pipewire/pipewire-pulse.conf.d
 install -d /etc/wireplumber/wireplumber.conf.d
 install -d /etc/NetworkManager/dispatcher.d
-install -d /var/lib/sddm/.config/wireplumber/wireplumber.conf.d
+if [[ -n $SDDM_HOME ]]; then
+    install -d "$SDDM_HOME/.config/wireplumber/wireplumber.conf.d"
+fi
 
 # The greeter must never own the X3 or bind the VBAN port. Mask its audio
 # units before the card check, then release the card.
-if ! id sddm >/dev/null 2>&1; then
+if [[ -z $SDDM_HOME ]]; then
     log "sddm user not found; skipping greeter audio mask"
 else
-    sddm_uid=$(id -u sddm)
-    if [[ -d /run/user/$sddm_uid ]]; then
+    if [[ -d /run/user/$SDDM_UID ]]; then
         log "masking the sddm greeter audio units"
-        runuser -u sddm -- env XDG_RUNTIME_DIR="/run/user/$sddm_uid" \
-            systemctl --user mask "${SDDM_AUDIO_UNITS[@]}"
+        as_user --user sddm systemctl --user mask "${SDDM_AUDIO_UNITS[@]}"
         for unit in "${SDDM_AUDIO_UNITS[@]}"; do
             record "masked-user sddm $unit"
         done
         log "stopping the sddm greeter audio units"
-        runuser -u sddm -- env XDG_RUNTIME_DIR="/run/user/$sddm_uid" \
-            systemctl --user stop "${SDDM_AUDIO_UNITS[@]}" || true
+        as_user --user sddm systemctl --user stop "${SDDM_AUDIO_UNITS[@]}" || true
     else
-        sddm_home=$(getent passwd sddm | cut -d: -f6)
-        sddm_mask_dir="$sddm_home/.config/systemd/user"
+        sddm_mask_dir="$SDDM_HOME/.config/systemd/user"
         log "sddm user manager is not running; writing masks to $sddm_mask_dir"
         install -d "$sddm_mask_dir"
         for unit in "${SDDM_AUDIO_UNITS[@]}"; do
@@ -66,7 +64,10 @@ link_config "$REPO/configs/pipewire-pulse-upmix.conf" /etc/pipewire/pipewire-pul
 link_config "$REPO/configs/client-upmix.conf" /etc/pipewire/client.conf.d/upmix.conf
 link_config "$REPO/configs/61-vban-route.conf" /etc/wireplumber/wireplumber.conf.d/61-vban-route.conf
 
-copy_file "$REPO/configs/51-sddm-no-alsa.conf" /var/lib/sddm/.config/wireplumber/wireplumber.conf.d/51-no-alsa.conf
+if [[ -n $SDDM_HOME ]]; then
+    copy_file "$REPO/configs/51-sddm-no-alsa.conf" \
+        "$SDDM_HOME/.config/wireplumber/wireplumber.conf.d/51-no-alsa.conf"
+fi
 
 link_config "$REPO/configs/alsa-restore-delayed.service" /etc/systemd/system/alsa-restore-delayed.service
 link_config "$REPO/configs/alsa-restore-delayed.timer" /etc/systemd/system/alsa-restore-delayed.timer

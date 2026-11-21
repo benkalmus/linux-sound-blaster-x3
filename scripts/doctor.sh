@@ -21,16 +21,13 @@ log "units"
 systemctl is-active alsa-restore-delayed.timer 2>/dev/null || true
 
 log "greeter audio"
-if ! id sddm >/dev/null 2>&1; then
+if [[ -z $SDDM_HOME ]]; then
     echo "sddm user not found; no greeter audio to mask"
 else
-    sddm_uid=$(id -u sddm)
-    sddm_home=$(getent passwd sddm | cut -d: -f6)
     mask_ok=1
     for unit in "${SDDM_AUDIO_UNITS[@]}"; do
-        state=$(runuser -u sddm -- env XDG_RUNTIME_DIR="/run/user/$sddm_uid" \
-            systemctl --user is-enabled "$unit" 2>/dev/null || true)
-        if [[ $state != masked && ! -L "$sddm_home/.config/systemd/user/$unit" ]]; then
+        state=$(as_user --user sddm systemctl --user is-enabled "$unit" 2>/dev/null || true)
+        if [[ $state != masked && ! -L "$SDDM_HOME/.config/systemd/user/$unit" ]]; then
             echo "warn: sddm $unit is ${state:-unknown}"
             mask_ok=0
         fi
@@ -38,7 +35,6 @@ else
     if [[ $mask_ok -eq 1 ]]; then
         echo "ok: all sddm audio units are masked"
     fi
-    runuser -u sddm -- env XDG_RUNTIME_DIR="/run/user/$sddm_uid" \
-        systemctl --user is-active pipewire.service 2>/dev/null || true
+    as_user --user sddm systemctl --user is-active pipewire.service 2>/dev/null || true
     ps -eo user,pid,cmd | grep -E '^sddm +.*(pipewire|wireplumber)' || true
 fi
