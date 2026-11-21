@@ -203,6 +203,10 @@ sudo alsactl store
 - **SDDM WirePlumber grabs Bluetooth and ALSA**: SDDM runs its own WirePlumber instance. `configs/51-sddm-no-bluetooth.conf` disables its Bluetooth; `configs/51-sddm-no-alsa.conf` disables its ALSA so it does not race the user PipeWire for the X3.
 - **LFE cutoff in client config**: `channelmix.lfe-cutoff` must be set in `stream.properties` of `pipewire-pulse.conf.d/`, not in `stream.props` of a sink node. The sink node's property is not inherited by client adapter nodes (e.g. Chromium). The `configs/pipewire-pulse-upmix.conf` file handles this correctly. The VBAN sender config includes `mix-lfe` and `lfe-cutoff` in its own `stream.props` since it's a module, not a client-connected sink.
 
+## Future Work
+
+- [Projector 5.1 into the X3](docs/future-optical-decode.md): eARC AVR, optical capture, and Edifier bypass findings. Sidelined. The current setup keeps the X3 on USB and uses Bluetooth for casual media.
+
 ## Development
 
 Python is checked with ruff and pyright. The agent tests run the real agent against a stub BlueZ on a private D-Bus bus, so they need no adapter, no root, and no restart.
