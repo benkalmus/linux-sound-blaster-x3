@@ -38,12 +38,15 @@ render "$REPO/configs/99-restart-pipewire" /etc/NetworkManager/dispatcher.d/99-r
 systemctl daemon-reload
 enable_unit alsa-restore-delayed.timer
 enable_unit x3-mixer.timer
-systemctl start x3-mixer.service
-record "unit-started x3-mixer.service"
 
 as_user systemctl --user restart pipewire pipewire-pulse wireplumber
 sleep 2
 as_user pactl set-default-sink unified-upmix
-as_user wpctl set-volume unified-upmix 1.0
+as_user pactl set-sink-volume unified-upmix 100%
+
+# The PipeWire restart re-inits the card and resets the mixer, so apply
+# the X3 volume after the restart.
+systemctl start x3-mixer.service
+record "unit-started x3-mixer.service"
 
 echo "Host setup complete. Run: make doctor"
